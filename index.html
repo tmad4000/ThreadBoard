@@ -20,6 +20,7 @@
             <button id="view-raw" disabled>View Raw Markdown</button>
             <button id="reveal-file" disabled>Reveal in Finder</button>
             <button id="copy-path" disabled>Copy Path</button>
+            <button id="open-guide" type="button">Guide</button>
           </div>
         </div>
         <div class="file-status">
@@ -55,6 +56,64 @@
             <button id="raw-close" type="button">Close</button>
           </div>
           <textarea id="raw-text" readonly></textarea>
+        </div>
+      </div>
+      <div id="guide-modal" class="modal">
+        <div class="modal-inner guide-modal-inner">
+          <div class="modal-header">
+            <h3>Threadboard Markdown Guide</h3>
+            <button id="guide-close" type="button">Close</button>
+          </div>
+          <div id="guide-body">
+            <section>
+              <h4>Conversation Basics</h4>
+              <ul>
+                <li>Plain lines are human messages. Prefix AI replies with <code>&gt; </code>.</li>
+                <li>You can begin with a simple single-column chat log; threads are optional.</li>
+                <li>Leave blank lines between thoughts when it improves readability.</li>
+              </ul>
+            </section>
+            <section>
+              <h4>Creating Threads</h4>
+              <ul>
+                <li>Start a column with a heading: <code>## [thread-name]</code>.</li>
+                <li>Alternatively use a delimiter line (default <code>---</code>) to split conversations.</li>
+                <li>Thread names may be left blank; the first message becomes the display title.</li>
+              </ul>
+            </section>
+            <section>
+              <h4>Adding Messages</h4>
+              <ul>
+                <li>Human entries append exactly as typed.</li>
+                <li>AI entries add the <code>&gt;</code> prefix automatically.</li>
+                <li>Use the per-column input area or edit the Markdown directly.</li>
+              </ul>
+            </section>
+            <section>
+              <h4>Managing Threads</h4>
+              <ul>
+                <li>Click a title to rename; delimiter threads get promoted to headings when renamed.</li>
+                <li>Delete removes the heading and all messages in that section.</li>
+                <li>Adjust delimiter and format preferences in the settings row above the board.</li>
+              </ul>
+            </section>
+            <section>
+              <h4>File Watching &amp; Collaboration</h4>
+              <ul>
+                <li>The app reloads when the Markdown file changes on disk.</li>
+                <li>Use <em>View Raw Markdown</em> to inspect the exact content.</li>
+                <li>Reveal or copy the current file path via the utility buttons.</li>
+              </ul>
+            </section>
+            <section>
+              <h4>Advanced Tips</h4>
+              <ul>
+                <li>Plain-chat sections before the first thread act as the main timeline.</li>
+                <li>Mix headings and delimiters to branch conversations without losing context.</li>
+                <li>Export to HTML for quick sharing or archiving.</li>
+              </ul>
+            </section>
+          </div>
         </div>
       </div>
     </div>

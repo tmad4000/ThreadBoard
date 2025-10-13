@@ -76,6 +76,14 @@ body {
   background: #3a3a3a;
 }
 
+#open-guide {
+  background: #146b3a;
+}
+
+#open-guide:hover {
+  background: #0f572f;
+}
+
 .thread-actions {
   padding: 0.75rem 1rem;
   background: #fafafa;
@@ -262,6 +270,10 @@ body {
   overflow: hidden;
 }
 
+.guide-modal-inner {
+  width: min(720px, 90vw);
+}
+
 .modal-header {
   display: flex;
   justify-content: space-between;
@@ -298,6 +310,34 @@ body {
 
 #raw-text:focus {
   outline: none;
+}
+
+#guide-body {
+  padding: 1rem 1.25rem 1.5rem;
+  overflow-y: auto;
+  flex: 1;
+  line-height: 1.5;
+}
+
+#guide-body h4 {
+  margin: 1.25rem 0 0.5rem;
+  font-size: 1.05rem;
+}
+
+#guide-body ul {
+  margin: 0;
+  padding-left: 1.2rem;
+}
+
+#guide-body li {
+  margin-bottom: 0.4rem;
+}
+
+#guide-body code {
+  background: rgba(27, 31, 35, 0.08);
+  padding: 0.1rem 0.3rem;
+  border-radius: 4px;
+  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, 'Liberation Mono', 'Courier New', monospace;
 }
 
 body.modal-open {

@@ -21,6 +21,7 @@
     viewRaw: document.getElementById('view-raw'),
     revealFile: document.getElementById('reveal-file'),
     copyPath: document.getElementById('copy-path'),
+    openGuide: document.getElementById('open-guide'),
     currentFile: document.getElementById('current-file'),
     watchStatus: document.getElementById('watch-status'),
     threadColumns: document.getElementById('thread-columns'),
@@ -30,6 +31,8 @@
     rawModal: document.getElementById('raw-modal'),
     rawText: document.getElementById('raw-text'),
     rawClose: document.getElementById('raw-close'),
+    guideModal: document.getElementById('guide-modal'),
+    guideClose: document.getElementById('guide-close'),
     delimiterInput: document.getElementById('delimiter-input'),
     threadFormat: document.getElementById('thread-format'),
   };
@@ -390,6 +393,18 @@
     return Boolean(dom.rawModal && dom.rawModal.classList.contains('open'));
   }
 
+  function isGuideModalOpen() {
+    return Boolean(dom.guideModal && dom.guideModal.classList.contains('open'));
+  }
+
+  function refreshModalState() {
+    if (isRawModalOpen() || isGuideModalOpen()) {
+      document.body.classList.add('modal-open');
+    } else {
+      document.body.classList.remove('modal-open');
+    }
+  }
+
   function openRawModal() {
     if (!dom.rawModal || !state.filePath) {
       return;
@@ -399,7 +414,7 @@
       dom.rawText.scrollTop = 0;
     }
     dom.rawModal.classList.add('open');
-    document.body.classList.add('modal-open');
+    refreshModalState();
   }
 
   function closeRawModal() {
@@ -407,7 +422,27 @@
       return;
     }
     dom.rawModal.classList.remove('open');
-    document.body.classList.remove('modal-open');
+    refreshModalState();
+  }
+
+  function openGuideModal() {
+    if (!dom.guideModal) {
+      return;
+    }
+    dom.guideModal.classList.add('open');
+    const guideBody = document.getElementById('guide-body');
+    if (guideBody) {
+      guideBody.scrollTop = 0;
+    }
+    refreshModalState();
+  }
+
+  function closeGuideModal() {
+    if (!dom.guideModal) {
+      return;
+    }
+    dom.guideModal.classList.remove('open');
+    refreshModalState();
   }
 
   function setFilePath(filePath) {
@@ -985,9 +1020,19 @@ ${body}
   }
 
   function handleGlobalKeydown(event) {
-    if (event.key === 'Escape' && isRawModalOpen()) {
+    if (event.key !== 'Escape') {
+      return;
+    }
+
+    if (isRawModalOpen()) {
       event.stopPropagation();
       closeRawModal();
+      return;
+    }
+
+    if (isGuideModalOpen()) {
+      event.stopPropagation();
+      closeGuideModal();
     }
   }
 
@@ -1006,6 +1051,19 @@ ${body}
       dom.rawModal.addEventListener('click', (event) => {
         if (event.target === dom.rawModal) {
           closeRawModal();
+        }
+      });
+    }
+    if (dom.openGuide) {
+      dom.openGuide.addEventListener('click', openGuideModal);
+    }
+    if (dom.guideClose) {
+      dom.guideClose.addEventListener('click', closeGuideModal);
+    }
+    if (dom.guideModal) {
+      dom.guideModal.addEventListener('click', (event) => {
+        if (event.target === dom.guideModal) {
+          closeGuideModal();
         }
       });
     }
