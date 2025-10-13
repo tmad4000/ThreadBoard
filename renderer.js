@@ -645,6 +645,9 @@
 
       const textarea = document.createElement('textarea');
       textarea.placeholder = 'Add a message…';
+      textarea.addEventListener('focus', () => {
+        textarea.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
+      });
       inputWrapper.appendChild(textarea);
 
       const buttonRow = document.createElement('div');
