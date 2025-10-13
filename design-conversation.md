@@ -6,3 +6,10 @@ Support plain chat history before threads exist and allow collapsing back to a s
 ## [terminal-chat-mode]
 Desire a terminal-style flow where multiple topics can be pursued concurrently—like chatting in separate shells while waiting on other AI responses.
 > Plan to keep the Markdown format compatible so each thread represents a topic, enabling quick context swaps without waiting on a single stream.
+
+## [request-tracker]
+- ✅ Added inline help/guide modal accessible from the Guide button in the header.
+- ✅ Supported Codex CLI transcript parsing (▌ for prompts, `>` for AI) with confirmation on import.
+- ✅ Exposed slider to resize thread columns and persisted preference.
+- ✅ Hardened HTML export with marked fallback and success toast.
+- 🔜 Explore timeline/board hybrid mode for collapsing threads back into a single chat.
