@@ -57,5 +57,7 @@ contextBridge.exposeInMainWorld('threadboard', {
     }
     return marked(markdown ?? '');
   },
+  revealFile: (filePath) => ipcRenderer.invoke('file:reveal', filePath),
+  copyFilePath: (filePath) => ipcRenderer.invoke('file:copy-path', filePath),
   quit: () => ipcRenderer.send('quit-app'),
 });

@@ -1,4 +1,4 @@
-const { app, BrowserWindow, dialog, ipcMain, Menu } = require('electron');
+const { app, BrowserWindow, dialog, ipcMain, Menu, shell, clipboard } = require('electron');
 const path = require('path');
 const fs = require('fs');
 
@@ -245,6 +245,38 @@ ipcMain.handle('file:export-html', async (_event, htmlContent) => {
   try {
     await fs.promises.writeFile(filePath, htmlContent, 'utf8');
     return { ok: true, filePath };
+  } catch (error) {
+    return { ok: false, error: error.message };
+  }
+});
+
+ipcMain.handle('file:reveal', async (_event, filePath) => {
+  if (!filePath) {
+    return { ok: false, error: 'No file selected' };
+  }
+
+  try {
+    await fs.promises.access(filePath, fs.constants.F_OK);
+  } catch (error) {
+    return { ok: false, error: 'File not found on disk' };
+  }
+
+  try {
+    shell.showItemInFolder(filePath);
+    return { ok: true };
+  } catch (error) {
+    return { ok: false, error: error.message };
+  }
+});
+
+ipcMain.handle('file:copy-path', (_event, filePath) => {
+  if (!filePath) {
+    return { ok: false, error: 'No file selected' };
+  }
+
+  try {
+    clipboard.writeText(filePath);
+    return { ok: true };
   } catch (error) {
     return { ok: false, error: error.message };
   }

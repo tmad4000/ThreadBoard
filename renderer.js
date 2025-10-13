@@ -11,6 +11,7 @@
     loadError: null,
     delimiter: '---',
     threadFormat: 'auto',
+    statusMessage: '',
   };
 
   const dom = {
@@ -40,6 +41,8 @@
     threadFormat: 'threadboard:threadFormat',
   };
 
+  let statusTimeoutId = null;
+
   function getStoredSetting(key) {
     try {
       return window.localStorage.getItem(key);
@@ -57,6 +60,24 @@
       }
     } catch (error) {
       console.warn('Could not persist preference', error);
+    }
+  }
+
+  function setStatusMessage(message, timeoutMs = 0) {
+    state.statusMessage = message || '';
+    updateFileStatus();
+
+    if (statusTimeoutId) {
+      clearTimeout(statusTimeoutId);
+      statusTimeoutId = null;
+    }
+
+    if (message && timeoutMs > 0) {
+      statusTimeoutId = window.setTimeout(() => {
+        state.statusMessage = '';
+        statusTimeoutId = null;
+        updateFileStatus();
+      }, timeoutMs);
     }
   }
 
@@ -276,6 +297,13 @@
     if (!state.filePath && isRawModalOpen()) {
       closeRawModal();
     }
+    if (!state.filePath) {
+      state.statusMessage = '';
+      if (statusTimeoutId) {
+        clearTimeout(statusTimeoutId);
+        statusTimeoutId = null;
+      }
+    }
     updateFileStatus();
     updateControlsState();
   }
@@ -285,13 +313,24 @@
       dom.currentFile.textContent = 'No file selected';
       dom.currentFile.removeAttribute('title');
       dom.watchStatus.textContent = '';
+      dom.watchStatus.removeAttribute('title');
       return;
     }
 
     const fileName = state.filePath.split(/[\\/]/).pop();
     dom.currentFile.textContent = fileName || state.filePath;
     dom.currentFile.setAttribute('title', state.filePath);
-    dom.watchStatus.textContent = state.watchError ? 'File watch error' : 'Watching for changes…';
+    const statusText = state.statusMessage
+      ? state.statusMessage
+      : state.watchError
+        ? 'File watch error'
+        : 'Watching for changes…';
+    dom.watchStatus.textContent = statusText;
+    if (state.watchError) {
+      dom.watchStatus.setAttribute('title', state.watchError);
+    } else {
+      dom.watchStatus.removeAttribute('title');
+    }
   }
 
   function updateControlsState() {
@@ -779,6 +818,8 @@ ${body}
       const result = await api.revealFile(state.filePath);
       if (!result?.ok && !result?.canceled) {
         window.alert(`Could not reveal file: ${result.error}`);
+      } else if (result?.ok) {
+        setStatusMessage('Revealed in Finder', 2500);
       }
       return;
     }
@@ -795,6 +836,8 @@ ${body}
       const result = await api.copyFilePath(state.filePath);
       if (!result?.ok) {
         window.alert(`Could not copy path: ${result?.error ?? 'Unknown error'}`);
+      } else {
+        setStatusMessage('Path copied to clipboard', 2000);
       }
       return;
     }
@@ -802,10 +845,12 @@ ${body}
     if (navigator.clipboard && navigator.clipboard.writeText) {
       try {
         await navigator.clipboard.writeText(state.filePath);
+        setStatusMessage('Path copied to clipboard', 2000);
+        return;
       } catch (error) {
         window.alert(`Could not copy path: ${error.message}`);
+        return;
       }
-      return;
     }
 
     window.alert('Clipboard copy is not supported in this environment.');
@@ -870,6 +915,11 @@ ${body}
 
     api.onFileWatchError((message) => {
       state.watchError = message || 'Unknown error';
+      state.statusMessage = '';
+      if (statusTimeoutId) {
+        clearTimeout(statusTimeoutId);
+        statusTimeoutId = null;
+      }
       updateFileStatus();
       renderAlerts();
     });
