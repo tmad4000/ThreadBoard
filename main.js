@@ -88,7 +88,16 @@ async function readFileContent(filePath) {
 }
 
 function buildMenu() {
+  const isMac = process.platform === 'darwin';
+
   const template = [
+    ...(isMac
+      ? [
+          {
+            role: 'appMenu',
+          },
+        ]
+      : []),
     {
       label: 'File',
       submenu: [
@@ -107,13 +116,25 @@ function buildMenu() {
           },
         },
         { type: 'separator' },
-        { role: 'quit' },
+        isMac ? { role: 'close' } : { role: 'quit' },
       ],
     },
+    { role: 'editMenu' },
     {
       label: 'View',
-      submenu: [{ role: 'reload' }, { role: 'forcereload' }, { role: 'toggledevtools' }, { type: 'separator' }, { role: 'resetzoom' }, { role: 'zoomin' }, { role: 'zoomout' }, { type: 'separator' }, { role: 'togglefullscreen' }],
+      submenu: [
+        { role: 'reload' },
+        { role: 'forcereload' },
+        { role: 'toggledevtools' },
+        { type: 'separator' },
+        { role: 'resetzoom' },
+        { role: 'zoomin' },
+        { role: 'zoomout' },
+        { type: 'separator' },
+        { role: 'togglefullscreen' },
+      ],
     },
+    { role: 'windowMenu' },
   ];
 
   Menu.setApplicationMenu(Menu.buildFromTemplate(template));
