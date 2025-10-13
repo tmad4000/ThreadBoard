@@ -10,21 +10,103 @@
     watchError: null,
     loadError: null,
     delimiter: '---',
+    threadFormat: 'auto',
   };
 
   const dom = {
     openFile: document.getElementById('open-file'),
     createFile: document.getElementById('create-file'),
     exportHtml: document.getElementById('export-html'),
+    viewRaw: document.getElementById('view-raw'),
+    revealFile: document.getElementById('reveal-file'),
+    copyPath: document.getElementById('copy-path'),
     currentFile: document.getElementById('current-file'),
     watchStatus: document.getElementById('watch-status'),
     threadColumns: document.getElementById('thread-columns'),
     newThreadForm: document.getElementById('new-thread-form'),
     newThreadName: document.getElementById('new-thread-name'),
     alerts: document.getElementById('alerts'),
+    rawModal: document.getElementById('raw-modal'),
+    rawText: document.getElementById('raw-text'),
+    rawClose: document.getElementById('raw-close'),
+    delimiterInput: document.getElementById('delimiter-input'),
+    threadFormat: document.getElementById('thread-format'),
   };
 
   const newThreadButton = dom.newThreadForm.querySelector('button[type="submit"]');
+
+  const SETTINGS_KEYS = {
+    delimiter: 'threadboard:delimiter',
+    threadFormat: 'threadboard:threadFormat',
+  };
+
+  function getStoredSetting(key) {
+    try {
+      return window.localStorage.getItem(key);
+    } catch (_error) {
+      return null;
+    }
+  }
+
+  function setStoredSetting(key, value) {
+    try {
+      if (value === null) {
+        window.localStorage.removeItem(key);
+      } else {
+        window.localStorage.setItem(key, value);
+      }
+    } catch (error) {
+      console.warn('Could not persist preference', error);
+    }
+  }
+
+  function setDelimiter(newDelimiter, { reparse = true, persist = true } = {}) {
+    const trimmed = (newDelimiter ?? '').trim();
+    const effective = trimmed || '---';
+    state.delimiter = effective;
+
+    if (dom.delimiterInput && dom.delimiterInput.value !== effective) {
+      dom.delimiterInput.value = effective;
+    }
+
+    if (persist) {
+      setStoredSetting(SETTINGS_KEYS.delimiter, effective);
+    }
+
+    if (reparse && state.filePath) {
+      updateContent(state.content);
+    }
+  }
+
+  function setThreadFormat(format, { persist = true } = {}) {
+    const allowed = new Set(['auto', 'heading', 'delimiter']);
+    const value = allowed.has(format) ? format : 'auto';
+    state.threadFormat = value;
+
+    if (dom.threadFormat && dom.threadFormat.value !== value) {
+      dom.threadFormat.value = value;
+    }
+
+    if (persist) {
+      setStoredSetting(SETTINGS_KEYS.threadFormat, value);
+    }
+  }
+
+  function loadInitialSettings() {
+    const savedDelimiter = getStoredSetting(SETTINGS_KEYS.delimiter);
+    if (savedDelimiter) {
+      setDelimiter(savedDelimiter, { reparse: false, persist: false });
+    } else {
+      setDelimiter(state.delimiter, { reparse: false, persist: false });
+    }
+
+    if (dom.delimiterInput) {
+      dom.delimiterInput.value = state.delimiter;
+    }
+
+    const savedFormat = getStoredSetting(SETTINGS_KEYS.threadFormat);
+    setThreadFormat(savedFormat || state.threadFormat, { persist: false });
+  }
 
   function normalizeNewlines(text) {
     return (text ?? '').replace(/\r\n/g, '\n').replace(/\r/g, '\n');
@@ -165,8 +247,35 @@
     return original.type === candidate.type;
   }
 
+  function isRawModalOpen() {
+    return Boolean(dom.rawModal && dom.rawModal.classList.contains('open'));
+  }
+
+  function openRawModal() {
+    if (!dom.rawModal || !state.filePath) {
+      return;
+    }
+    if (dom.rawText) {
+      dom.rawText.value = state.content;
+      dom.rawText.scrollTop = 0;
+    }
+    dom.rawModal.classList.add('open');
+    document.body.classList.add('modal-open');
+  }
+
+  function closeRawModal() {
+    if (!dom.rawModal) {
+      return;
+    }
+    dom.rawModal.classList.remove('open');
+    document.body.classList.remove('modal-open');
+  }
+
   function setFilePath(filePath) {
     state.filePath = filePath || null;
+    if (!state.filePath && isRawModalOpen()) {
+      closeRawModal();
+    }
     updateFileStatus();
     updateControlsState();
   }
@@ -190,6 +299,24 @@
     dom.exportHtml.disabled = !hasFile;
     dom.newThreadName.disabled = !hasFile;
     newThreadButton.disabled = !hasFile;
+    if (dom.viewRaw) {
+      dom.viewRaw.disabled = !hasFile;
+    }
+    if (dom.revealFile) {
+      dom.revealFile.disabled = !hasFile;
+    }
+    if (dom.copyPath) {
+      dom.copyPath.disabled = !hasFile;
+    }
+    if (dom.threadFormat) {
+      dom.threadFormat.disabled = !hasFile;
+      if (dom.threadFormat.value !== state.threadFormat) {
+        dom.threadFormat.value = state.threadFormat;
+      }
+    }
+    if (dom.delimiterInput && dom.delimiterInput.value !== state.delimiter) {
+      dom.delimiterInput.value = state.delimiter;
+    }
     dom.threadColumns.classList.toggle('empty', !hasFile || state.threads.length === 0);
   }
 
@@ -197,6 +324,9 @@
     const normalized = normalizeNewlines(content);
     state.content = normalized;
     state.threads = parseThreads(normalized, state.delimiter);
+    if (isRawModalOpen() && dom.rawText) {
+      dom.rawText.value = state.content;
+    }
     renderThreads();
     updateControlsState();
   }
@@ -471,10 +601,15 @@
     return raw.replace(/[\r\n]/g, ' ').replace(/]/g, '').trim();
   }
 
-  function composeContentWithNewThread(content, threadName) {
+  function composeContentWithNewThread(content, threadName, format) {
     const normalized = normalizeNewlines(content);
-    const headingLine = `## [${threadName}]`;
     const trimmed = normalized.trimEnd();
+
+    if (format === 'delimiter') {
+      return composeDelimiterThread(trimmed, threadName);
+    }
+
+    const headingLine = `## [${threadName}]`;
 
     if (!trimmed) {
       return `${headingLine}\n`;
@@ -488,7 +623,62 @@
       result += '\n';
     }
     result += `${headingLine}\n`;
-    return result;
+    return ensureTrailingNewline(result);
+  }
+
+  function composeDelimiterThread(existingContent, threadName) {
+    const effectiveDelimiter = state.delimiter && state.delimiter.trim().length > 0
+      ? state.delimiter.trim()
+      : '---';
+
+    let result = existingContent;
+    const hasExisting = result.length > 0;
+
+    if (hasExisting) {
+      if (!result.endsWith('\n')) {
+        result += '\n';
+      }
+
+      const lines = result.split('\n');
+      let lastMeaningful = '';
+      for (let i = lines.length - 1; i >= 0; i -= 1) {
+        const value = lines[i].trim();
+        if (value.length > 0) {
+          lastMeaningful = value;
+          break;
+        }
+      }
+
+      if (lastMeaningful !== effectiveDelimiter) {
+        result += `${effectiveDelimiter}\n`;
+      }
+    } else {
+      result = `${effectiveDelimiter}\n`;
+    }
+
+    if (threadName) {
+      result += `${threadName}\n`;
+    } else {
+      result += '\n';
+    }
+
+    return ensureTrailingNewline(result);
+  }
+
+  function determineThreadFormat(threadName) {
+    if (state.threadFormat === 'heading') {
+      return 'heading';
+    }
+    if (state.threadFormat === 'delimiter') {
+      return 'delimiter';
+    }
+
+    if (threadName) {
+      return 'heading';
+    }
+
+    const hasNonHeading = state.threads.some((thread) => thread.type !== 'heading');
+    return hasNonHeading ? 'delimiter' : 'heading';
   }
 
   async function handleNewThread(event) {
@@ -509,7 +699,8 @@
     }
 
     state.loadError = null;
-    const newContent = composeContentWithNewThread(response.content, threadName);
+    const format = determineThreadFormat(threadName);
+    const newContent = composeContentWithNewThread(response.content, threadName, format);
     const writeResult = await api.writeFile(newContent);
     if (!writeResult.ok) {
       state.loadError = writeResult.error;
@@ -571,11 +762,101 @@ ${body}
     }
   }
 
+  function handleViewRaw() {
+    if (!state.filePath) {
+      window.alert('Select a Markdown file first.');
+      return;
+    }
+    openRawModal();
+  }
+
+  async function handleRevealFile() {
+    if (!state.filePath) {
+      return;
+    }
+
+    if (api.revealFile) {
+      const result = await api.revealFile(state.filePath);
+      if (!result?.ok && !result?.canceled) {
+        window.alert(`Could not reveal file: ${result.error}`);
+      }
+      return;
+    }
+
+    window.alert('Reveal in Finder is not available in this build.');
+  }
+
+  async function handleCopyPath() {
+    if (!state.filePath) {
+      return;
+    }
+
+    if (api.copyFilePath) {
+      const result = await api.copyFilePath(state.filePath);
+      if (!result?.ok) {
+        window.alert(`Could not copy path: ${result?.error ?? 'Unknown error'}`);
+      }
+      return;
+    }
+
+    if (navigator.clipboard && navigator.clipboard.writeText) {
+      try {
+        await navigator.clipboard.writeText(state.filePath);
+      } catch (error) {
+        window.alert(`Could not copy path: ${error.message}`);
+      }
+      return;
+    }
+
+    window.alert('Clipboard copy is not supported in this environment.');
+  }
+
+  function handleDelimiterChange(event) {
+    setDelimiter(event.target.value, { reparse: true, persist: true });
+  }
+
+  function handleThreadFormatChange(event) {
+    setThreadFormat(event.target.value, { persist: true });
+  }
+
+  function handleGlobalKeydown(event) {
+    if (event.key === 'Escape' && isRawModalOpen()) {
+      event.stopPropagation();
+      closeRawModal();
+    }
+  }
+
   function wireEvents() {
     dom.openFile.addEventListener('click', handleOpenFile);
     dom.createFile.addEventListener('click', handleCreateFile);
     dom.exportHtml.addEventListener('click', exportHtml);
     dom.newThreadForm.addEventListener('submit', handleNewThread);
+    if (dom.viewRaw) {
+      dom.viewRaw.addEventListener('click', handleViewRaw);
+    }
+    if (dom.rawClose) {
+      dom.rawClose.addEventListener('click', closeRawModal);
+    }
+    if (dom.rawModal) {
+      dom.rawModal.addEventListener('click', (event) => {
+        if (event.target === dom.rawModal) {
+          closeRawModal();
+        }
+      });
+    }
+    if (dom.copyPath) {
+      dom.copyPath.addEventListener('click', handleCopyPath);
+    }
+    if (dom.revealFile) {
+      dom.revealFile.addEventListener('click', handleRevealFile);
+    }
+    if (dom.delimiterInput) {
+      dom.delimiterInput.addEventListener('change', handleDelimiterChange);
+    }
+    if (dom.threadFormat) {
+      dom.threadFormat.addEventListener('change', handleThreadFormatChange);
+    }
+    document.addEventListener('keydown', handleGlobalKeydown);
 
     api.onFileChanged(async () => {
       await reloadFromDisk();
@@ -620,6 +901,7 @@ ${body}
   }
 
   function init() {
+    loadInitialSettings();
     wireEvents();
     updateControlsState();
     renderAlerts();

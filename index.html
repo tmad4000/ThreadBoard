@@ -10,10 +10,17 @@
   <body>
     <div id="app">
       <header class="top-bar">
-        <div class="file-controls">
-          <button id="open-file">Open Markdown…</button>
-          <button id="create-file">Create Markdown…</button>
-          <button id="export-html" disabled>Export View to HTML…</button>
+        <div class="controls-wrapper">
+          <div class="file-controls">
+            <button id="open-file">Open Markdown…</button>
+            <button id="create-file">Create Markdown…</button>
+            <button id="export-html" disabled>Export View to HTML…</button>
+          </div>
+          <div class="utility-controls">
+            <button id="view-raw" disabled>View Raw Markdown</button>
+            <button id="reveal-file" disabled>Reveal in Finder</button>
+            <button id="copy-path" disabled>Copy Path</button>
+          </div>
         </div>
         <div class="file-status">
           <span id="current-file">No file selected</span>
@@ -26,11 +33,30 @@
           <input id="new-thread-name" type="text" placeholder="Leave blank for untitled" />
           <button type="submit">Add Thread</button>
         </form>
+        <div class="settings-row">
+          <label for="delimiter-input">Delimiter</label>
+          <input id="delimiter-input" type="text" placeholder="---" />
+          <label for="thread-format">Thread format</label>
+          <select id="thread-format">
+            <option value="auto">Auto</option>
+            <option value="heading">Headings</option>
+            <option value="delimiter">Delimiter only</option>
+          </select>
+        </div>
       </section>
       <div id="alerts"></div>
       <main id="thread-columns" class="thread-columns empty">
         <div class="placeholder">Select or create a Markdown file to begin.</div>
       </main>
+      <div id="raw-modal" class="modal">
+        <div class="modal-inner">
+          <div class="modal-header">
+            <h3>Raw Markdown</h3>
+            <button id="raw-close" type="button">Close</button>
+          </div>
+          <textarea id="raw-text" readonly></textarea>
+        </div>
+      </div>
     </div>
     <script src="renderer.js"></script>
   </body>

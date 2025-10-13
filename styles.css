@@ -26,17 +26,28 @@ body {
 .top-bar {
   display: flex;
   justify-content: space-between;
-  align-items: center;
+  align-items: flex-start;
   padding: 0.75rem 1rem;
   background: #222;
   color: #f5f5f5;
 }
 
-.top-bar button {
-  margin-right: 0.5rem;
+.controls-wrapper {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+  align-items: flex-start;
 }
 
-.file-controls button {
+.file-controls,
+.utility-controls {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+}
+
+.file-controls button,
+.utility-controls button {
   background: #3a7afe;
   border: none;
   color: #fff;
@@ -46,13 +57,23 @@ body {
   transition: background 0.2s;
 }
 
-.file-controls button:disabled {
+.file-controls button:disabled,
+.utility-controls button:disabled {
   background: #666;
   cursor: not-allowed;
 }
 
-.file-controls button:hover:not(:disabled) {
+.file-controls button:hover:not(:disabled),
+.utility-controls button:hover:not(:disabled) {
   background: #2e63d8;
+}
+
+.utility-controls button {
+  background: #4a4a4a;
+}
+
+.utility-controls button:hover:not(:disabled) {
+  background: #3a3a3a;
 }
 
 .thread-actions {
@@ -86,6 +107,28 @@ body {
 
 .thread-actions button:hover {
   background: #008756;
+}
+
+.settings-row {
+  margin-top: 0.75rem;
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  flex-wrap: wrap;
+}
+
+.settings-row label {
+  font-size: 0.9rem;
+  color: #444;
+}
+
+#delimiter-input,
+#thread-format {
+  padding: 0.4rem 0.5rem;
+  border-radius: 4px;
+  border: 1px solid #bbb;
+  background: #fff;
+  min-width: 140px;
 }
 
 .thread-columns {
@@ -175,6 +218,75 @@ body {
   color: #777;
 }
 
+.modal {
+  position: fixed;
+  inset: 0;
+  background: rgba(20, 20, 20, 0.6);
+  display: none;
+  align-items: center;
+  justify-content: center;
+  z-index: 1000;
+  padding: 1.5rem;
+}
+
+.modal.open {
+  display: flex;
+}
+
+.modal-inner {
+  background: #fff;
+  color: #1f1f1f;
+  width: min(900px, 90vw);
+  height: min(80vh, 640px);
+  border-radius: 8px;
+  display: flex;
+  flex-direction: column;
+  box-shadow: 0 12px 32px rgba(0, 0, 0, 0.35);
+  overflow: hidden;
+}
+
+.modal-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 0.75rem 1rem;
+  border-bottom: 1px solid #e5e5e5;
+  background: #f7f7f7;
+}
+
+.modal-header h3 {
+  margin: 0;
+  font-size: 1.1rem;
+}
+
+.modal-header button {
+  background: none;
+  border: none;
+  color: #d14343;
+  font-weight: 600;
+  cursor: pointer;
+  padding: 0.25rem 0.5rem;
+}
+
+#raw-text {
+  flex: 1;
+  border: none;
+  resize: none;
+  padding: 1rem;
+  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, 'Liberation Mono', 'Courier New', monospace;
+  font-size: 0.95rem;
+  background: #fafafa;
+  color: inherit;
+}
+
+#raw-text:focus {
+  outline: none;
+}
+
+body.modal-open {
+  overflow: hidden;
+}
+
 .thread-input {
   border-top: 1px solid #eee;
   padding: 0.75rem;
@@ -260,5 +372,14 @@ button.add-ai:hover {
 
   .file-status {
     align-items: flex-start;
+  }
+
+  .controls-wrapper {
+    width: 100%;
+  }
+
+  .utility-controls,
+  .file-controls {
+    width: 100%;
   }
 }
