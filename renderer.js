@@ -12,6 +12,7 @@
     delimiter: '---',
     threadFormat: 'auto',
     statusMessage: '',
+    columnWidth: 320,
   };
 
   const dom = {
@@ -35,6 +36,8 @@
     guideClose: document.getElementById('guide-close'),
     delimiterInput: document.getElementById('delimiter-input'),
     threadFormat: document.getElementById('thread-format'),
+    columnWidth: document.getElementById('column-width'),
+    columnWidthValue: document.getElementById('column-width-value'),
   };
 
   const newThreadButton = dom.newThreadForm.querySelector('button[type="submit"]');
@@ -42,6 +45,7 @@
   const SETTINGS_KEYS = {
     delimiter: 'threadboard:delimiter',
     threadFormat: 'threadboard:threadFormat',
+    columnWidth: 'threadboard:columnWidth',
   };
 
   let statusTimeoutId = null;
@@ -130,6 +134,17 @@
 
     const savedFormat = getStoredSetting(SETTINGS_KEYS.threadFormat);
     setThreadFormat(savedFormat || state.threadFormat, { persist: false });
+
+    const savedWidth = getStoredSetting(SETTINGS_KEYS.columnWidth);
+    if (savedWidth && !Number.isNaN(Number(savedWidth))) {
+      setColumnWidth(Number(savedWidth), { persist: false });
+    } else {
+      applyColumnWidth(state.columnWidth);
+    }
+    updateColumnWidthDisplay();
+    if (dom.columnWidth) {
+      dom.columnWidth.value = String(state.columnWidth);
+    }
   }
 
   function normalizeNewlines(text) {
@@ -509,6 +524,13 @@
     if (dom.delimiterInput && dom.delimiterInput.value !== state.delimiter) {
       dom.delimiterInput.value = state.delimiter;
     }
+    if (dom.columnWidth) {
+      dom.columnWidth.disabled = false;
+      if (dom.columnWidth.value !== String(state.columnWidth)) {
+        dom.columnWidth.value = String(state.columnWidth);
+      }
+    }
+    updateColumnWidthDisplay();
     dom.threadColumns.classList.toggle('empty', !hasFile || state.threads.length === 0);
   }
 
@@ -1172,6 +1194,37 @@ ${body}
     setThreadFormat(event.target.value, { persist: true });
   }
 
+  function applyColumnWidth(width) {
+    const clamped = Math.max(200, Math.min(800, Math.round(width)));
+    state.columnWidth = clamped;
+    document.documentElement.style.setProperty('--thread-column-width', `${clamped}px`);
+  }
+
+  function updateColumnWidthDisplay() {
+    if (dom.columnWidthValue) {
+      dom.columnWidthValue.textContent = `${state.columnWidth} px`;
+    }
+  }
+
+  function setColumnWidth(width, { persist = true } = {}) {
+    applyColumnWidth(width);
+    updateColumnWidthDisplay();
+    if (dom.columnWidth && dom.columnWidth.value !== String(state.columnWidth)) {
+      dom.columnWidth.value = String(state.columnWidth);
+    }
+    if (persist) {
+      setStoredSetting(SETTINGS_KEYS.columnWidth, String(state.columnWidth));
+    }
+  }
+
+  function handleColumnWidthChange(event) {
+    const value = Number(event.target.value);
+    if (Number.isNaN(value)) {
+      return;
+    }
+    setColumnWidth(value, { persist: true });
+  }
+
   function handleGlobalKeydown(event) {
     if (event.key !== 'Escape') {
       return;
@@ -1231,6 +1284,10 @@ ${body}
     }
     if (dom.threadFormat) {
       dom.threadFormat.addEventListener('change', handleThreadFormatChange);
+    }
+    if (dom.columnWidth) {
+      dom.columnWidth.addEventListener('input', handleColumnWidthChange);
+      dom.columnWidth.addEventListener('change', handleColumnWidthChange);
     }
     document.addEventListener('keydown', handleGlobalKeydown);
 
