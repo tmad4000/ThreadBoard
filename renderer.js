@@ -9,6 +9,7 @@
     threads: [],
     watchError: null,
     loadError: null,
+    delimiter: '---',
   };
 
   const dom = {
@@ -36,28 +37,132 @@
     return text.endsWith('\n') ? text : `${text}\n`;
   }
 
-  function parseThreads(content) {
-    const lines = normalizeNewlines(content).split('\n');
-    const threads = [];
-    let current = null;
-    let order = -1;
+  function parseThreads(content, delimiter) {
+    const normalized = normalizeNewlines(content);
+    const lines = normalized.split('\n');
+    const segments = [];
 
-    for (const line of lines) {
-      const match = line.match(headingPattern);
-      if (match) {
-        order += 1;
-        current = {
-          name: match[1] ?? '',
-          order,
-          lines: [],
-        };
-        threads.push(current);
-      } else if (current) {
-        current.lines.push(line);
+    let current = null;
+    let pendingDelimiter = null;
+    let nextOrder = 0;
+
+    const trimmedDelimiter = (delimiter ?? '').trim();
+
+    function closeCurrent(endIndex) {
+      if (!current) {
+        return;
+      }
+
+      current.end = endIndex;
+
+      const displayLines = [...current.lines];
+      while (displayLines.length && displayLines[displayLines.length - 1] === '') {
+        displayLines.pop();
+      }
+
+      segments.push({
+        order: current.order,
+        name: current.name,
+        type: current.type,
+        lines: displayLines,
+        headingLine: current.headingLine,
+        contentStart: current.contentStart,
+        start: current.start,
+        end: current.end,
+        firstLine: current.firstLine,
+        previousDelimiterIndex: current.previousDelimiterIndex,
+      });
+
+      current = null;
+    }
+
+    function startHeading(match, lineIndex) {
+      current = {
+        order: nextOrder,
+        name: match[1] ?? '',
+        type: 'heading',
+        headingLine: lineIndex,
+        contentStart: lineIndex + 1,
+        start: lineIndex,
+        lines: [],
+        firstLine: null,
+        previousDelimiterIndex: pendingDelimiter?.index ?? null,
+      };
+      nextOrder += 1;
+      pendingDelimiter = null;
+    }
+
+    function startPlain(lineIndex, fromDelimiter) {
+      current = {
+        order: nextOrder,
+        name: '',
+        type: fromDelimiter ? 'delimiter' : 'plain',
+        headingLine: null,
+        contentStart: lineIndex,
+        start: lineIndex,
+        lines: [],
+        firstLine: null,
+        previousDelimiterIndex: fromDelimiter ? pendingDelimiter?.index ?? null : null,
+      };
+      nextOrder += 1;
+      pendingDelimiter = null;
+    }
+
+    for (let i = 0; i <= lines.length; i += 1) {
+      const line = i < lines.length ? lines[i] : null;
+      const headingMatch = line ? line.match(headingPattern) : null;
+      const isDelimiter = Boolean(
+        line !== null && trimmedDelimiter && line.trim() === trimmedDelimiter,
+      );
+      const isEnd = i === lines.length;
+
+      if (isEnd || headingMatch || isDelimiter) {
+        if (current) {
+          closeCurrent(i);
+        }
+      }
+
+      if (isEnd) {
+        break;
+      }
+
+      if (headingMatch) {
+        startHeading(headingMatch, i);
+        continue;
+      }
+
+      if (isDelimiter) {
+        pendingDelimiter = { index: i };
+        continue;
+      }
+
+      if (!current) {
+        startPlain(i, Boolean(pendingDelimiter));
+      }
+
+      current.lines.push(line);
+      if (current.firstLine === null && line.trim().length > 0) {
+        current.firstLine = line.trim();
       }
     }
 
-    return threads;
+    return segments;
+  }
+
+  function isMatchingThread(original, candidate) {
+    if (!candidate) {
+      return false;
+    }
+    if (original.type === 'heading') {
+      return candidate.type === 'heading' && candidate.name === original.name;
+    }
+    if (candidate.type === 'heading') {
+      return false;
+    }
+    if (original.firstLine && candidate.firstLine) {
+      return original.firstLine === candidate.firstLine;
+    }
+    return original.type === candidate.type;
   }
 
   function setFilePath(filePath) {
@@ -91,7 +196,7 @@
   function updateContent(content) {
     const normalized = normalizeNewlines(content);
     state.content = normalized;
-    state.threads = parseThreads(normalized);
+    state.threads = parseThreads(normalized, state.delimiter);
     renderThreads();
     updateControlsState();
   }
@@ -224,27 +329,6 @@
     });
   }
 
-  function findThreadRange(lines, targetOrder) {
-    let currentOrder = -1;
-    for (let i = 0; i < lines.length; i += 1) {
-      const match = lines[i].match(headingPattern);
-      if (match) {
-        currentOrder += 1;
-        if (currentOrder === targetOrder) {
-          let end = lines.length;
-          for (let j = i + 1; j < lines.length; j += 1) {
-            if (headingPattern.test(lines[j])) {
-              end = j;
-              break;
-            }
-          }
-          return { start: i, end };
-        }
-      }
-    }
-    return null;
-  }
-
   async function appendMessage(thread, rawText, isAi) {
     if (!state.filePath) {
       window.alert('Select a Markdown file first.');
@@ -266,9 +350,10 @@
     state.loadError = null;
     const content = normalizeNewlines(response.content);
     const lines = content.split('\n');
-    const range = findThreadRange(lines, thread.order);
-    if (!range) {
-      window.alert('Thread not found in file. It may have been renamed or removed externally.');
+    const segments = parseThreads(content, state.delimiter);
+    const target = segments.find((seg) => seg.order === thread.order);
+    if (!isMatchingThread(thread, target)) {
+      window.alert('Thread not found or it changed externally. Reloading the latest content.');
       await reloadFromDisk();
       return;
     }
@@ -278,8 +363,9 @@
       return;
     }
 
-    let insertIndex = range.end;
-    while (insertIndex > range.start + 1 && lines[insertIndex - 1] === '') {
+    let insertIndex = target.end;
+    const lowerBound = target.contentStart ?? 0;
+    while (insertIndex > lowerBound && lines[insertIndex - 1] === '') {
       insertIndex -= 1;
     }
 
@@ -340,19 +426,26 @@
     state.loadError = null;
     const content = normalizeNewlines(response.content);
     const lines = content.split('\n');
-    const range = findThreadRange(lines, thread.order);
-    if (!range) {
-      window.alert('Thread not found in file.');
+    const segments = parseThreads(content, state.delimiter);
+    const target = segments.find((seg) => seg.order === thread.order);
+
+    if (!isMatchingThread(thread, target)) {
+      window.alert('Thread not found or it changed externally. Reloading the latest content.');
       await reloadFromDisk();
       return;
     }
 
-    const removeCount = range.end - range.start;
-    lines.splice(range.start, removeCount);
+    const removeStart = target.headingLine ?? target.contentStart;
+    const removeEnd = target.end;
+    const removeCount = Math.max(0, removeEnd - removeStart);
+    if (removeCount > 0) {
+      lines.splice(removeStart, removeCount);
+    }
 
     // Remove redundant blank lines left behind.
-    while (range.start < lines.length - 1 && lines[range.start] === '' && lines[range.start + 1] === '') {
-      lines.splice(range.start, 1);
+    let cleanupIndex = removeStart;
+    while (cleanupIndex < lines.length - 1 && lines[cleanupIndex] === '' && lines[cleanupIndex + 1] === '') {
+      lines.splice(cleanupIndex, 1);
     }
     while (lines.length && lines[0] === '') {
       lines.shift();
