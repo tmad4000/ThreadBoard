@@ -482,6 +482,12 @@
       dom.currentFile.removeAttribute('title');
       dom.watchStatus.textContent = '';
       dom.watchStatus.removeAttribute('title');
+      if (dom.copyPath) {
+        dom.copyPath.removeAttribute('title');
+      }
+      if (dom.revealFile) {
+        dom.revealFile.removeAttribute('title');
+      }
       return;
     }
 
@@ -498,6 +504,12 @@
       dom.watchStatus.setAttribute('title', state.watchError);
     } else {
       dom.watchStatus.removeAttribute('title');
+    }
+    if (dom.copyPath) {
+      dom.copyPath.setAttribute('title', state.filePath);
+    }
+    if (dom.revealFile) {
+      dom.revealFile.setAttribute('title', state.filePath);
     }
   }
 
