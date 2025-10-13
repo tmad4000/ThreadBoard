@@ -559,6 +559,16 @@
     updateControlsState();
   }
 
+  function applyOpenedFile(result) {
+    if (!result || !result.filePath) {
+      return;
+    }
+    state.watchError = null;
+    setFilePath(result.filePath);
+    updateContent(result.content || '');
+    renderAlerts();
+  }
+
   function renderThreads() {
     const { threadColumns } = dom;
     threadColumns.innerHTML = '';
@@ -1475,6 +1485,9 @@ ${body}
 
     api.onMenuOpenFile(() => handleOpenFile());
     api.onMenuCreateFile(() => handleCreateFile());
+    api.onFileOpened((payload) => {
+      applyOpenedFile(payload);
+    });
   }
 
   async function handleOpenFile() {
@@ -1482,10 +1495,7 @@ ${body}
     if (!result || result.canceled) {
       return;
     }
-    state.watchError = null;
-    setFilePath(result.filePath);
-    updateContent(result.content || '');
-    renderAlerts();
+    applyOpenedFile(result);
   }
 
   async function handleCreateFile() {
@@ -1493,10 +1503,7 @@ ${body}
     if (!result || result.canceled) {
       return;
     }
-    state.watchError = null;
-    setFilePath(result.filePath);
-    updateContent(result.content || '');
-    renderAlerts();
+    applyOpenedFile(result);
   }
 
   function init() {

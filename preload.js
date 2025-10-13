@@ -70,6 +70,11 @@ contextBridge.exposeInMainWorld('threadboard', {
     ipcRenderer.on('menu-create-file', handler);
     return () => ipcRenderer.removeListener('menu-create-file', handler);
   },
+  onFileOpened: (callback) => {
+    const handler = (_event, payload) => callback(payload);
+    ipcRenderer.on('file-opened-direct', handler);
+    return () => ipcRenderer.removeListener('file-opened-direct', handler);
+  },
   exportHtml: (html) => ipcRenderer.invoke('file:export-html', html),
   renderMarkdown: async (markdown) => {
     try {

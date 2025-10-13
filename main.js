@@ -7,6 +7,10 @@ let mainWindow;
 let currentFilePath = null;
 let fileWatcher = null;
 let changeDebounce = null;
+let recentFiles = [];
+let recentFilesPath = null;
+
+const RECENT_MAX = 10;
 
 function createWindow() {
   mainWindow = new BrowserWindow({
@@ -87,17 +91,30 @@ async function readFileContent(filePath) {
   return fs.promises.readFile(targetPath, 'utf8');
 }
 
-function buildMenu() {
+function getMenuTemplate() {
   const isMac = process.platform === 'darwin';
 
-  const template = [
-    ...(isMac
-      ? [
-          {
-            role: 'appMenu',
+  const openRecentSubmenu = recentFiles.length
+    ? [
+        ...recentFiles.map((filePath) => ({
+          label: path.basename(filePath) || filePath,
+          toolTip: filePath,
+          click: async () => {
+            await openRecentFile(filePath);
           },
-        ]
-      : []),
+        })),
+        { type: 'separator' },
+        {
+          label: 'Clear Menu',
+          click: async () => {
+            await clearRecentFiles();
+          },
+        },
+      ]
+    : [{ label: 'No Recent Files', enabled: false }];
+
+  return [
+    ...(isMac ? [{ role: 'appMenu' }] : []),
     {
       label: 'File',
       submenu: [
@@ -114,6 +131,10 @@ function buildMenu() {
           click: async () => {
             notifyRenderer('menu-create-file');
           },
+        },
+        {
+          label: 'Open Recent',
+          submenu: openRecentSubmenu,
         },
         { type: 'separator' },
         isMac ? { role: 'close' } : { role: 'quit' },
@@ -136,11 +157,87 @@ function buildMenu() {
     },
     { role: 'windowMenu' },
   ];
-
-  Menu.setApplicationMenu(Menu.buildFromTemplate(template));
 }
 
-app.whenReady().then(() => {
+function buildMenu() {
+  Menu.setApplicationMenu(Menu.buildFromTemplate(getMenuTemplate()));
+}
+
+async function loadRecentFiles() {
+  try {
+    const raw = await fs.promises.readFile(recentFilesPath, 'utf8');
+    const parsed = JSON.parse(raw);
+    if (Array.isArray(parsed)) {
+      recentFiles = parsed.filter((item) => typeof item === 'string');
+    }
+  } catch (error) {
+    recentFiles = [];
+  }
+}
+
+async function saveRecentFiles() {
+  try {
+    await fs.promises.writeFile(recentFilesPath, JSON.stringify(recentFiles, null, 2), 'utf8');
+  } catch (error) {
+    console.warn('Failed to persist recent files:', error);
+  }
+}
+
+async function clearRecentFiles() {
+  recentFiles = [];
+  await saveRecentFiles();
+  buildMenu();
+}
+
+async function touchRecentFile(filePath) {
+  if (!filePath) {
+    return;
+  }
+  const fullPath = path.resolve(filePath);
+  recentFiles = [fullPath, ...recentFiles.filter((file) => file !== fullPath)];
+  if (recentFiles.length > RECENT_MAX) {
+    recentFiles = recentFiles.slice(0, RECENT_MAX);
+  }
+  if (process.platform === 'darwin') {
+    app.addRecentDocument(fullPath);
+  }
+  await saveRecentFiles();
+  buildMenu();
+}
+
+async function openRecentFile(filePath) {
+  try {
+    await fs.promises.access(filePath, fs.constants.F_OK);
+  } catch (error) {
+    await clearRecentFileEntry(filePath);
+    dialog.showErrorBox('File Not Found', `The file could not be found:
+
+${filePath}`);
+    return;
+  }
+
+  try {
+    const content = await fs.promises.readFile(filePath, 'utf8');
+    await touchRecentFile(filePath);
+    setCurrentFile(filePath);
+    notifyRenderer('file-opened-direct', { filePath, content });
+  } catch (error) {
+    dialog.showErrorBox('Failed to open file', error.message);
+  }
+}
+
+async function clearRecentFileEntry(filePath) {
+  const before = recentFiles.length;
+  recentFiles = recentFiles.filter((item) => item !== filePath);
+  if (recentFiles.length !== before) {
+    await saveRecentFiles();
+    buildMenu();
+  }
+}
+
+app.whenReady().then(async () => {
+  recentFilesPath = path.join(app.getPath('userData'), 'recent-files.json');
+  await loadRecentFiles();
   buildMenu();
   createWindow();
 
@@ -182,6 +279,7 @@ ipcMain.handle('dialog:openFile', async () => {
   }
 
   setCurrentFile(filePath);
+  await touchRecentFile(filePath);
   return { canceled: false, filePath, content };
 });
 
@@ -210,6 +308,7 @@ ipcMain.handle('dialog:createFile', async () => {
 
   const content = await readFileContent(filePath).catch(() => '');
   setCurrentFile(filePath);
+  await touchRecentFile(filePath);
   return { canceled: false, filePath, content };
 });
 
