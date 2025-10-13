@@ -675,13 +675,7 @@
         window.alert('Select a Markdown file first.');
         return;
       }
-      const name = window.prompt('New thread name (optional)', '');
-      if (name === null) {
-        return;
-      }
-      createThread(name).catch((error) => {
-        console.error('Failed to create thread from board card', error);
-      });
+      startInlineThreadComposer(addCard);
     });
     threadColumns.appendChild(addCard);
   }
@@ -1270,6 +1264,75 @@ ${body}
     if (persist) {
       setStoredSetting(SETTINGS_KEYS.columnWidth, String(state.columnWidth));
     }
+  }
+
+  function startInlineThreadComposer(card) {
+    if (card.dataset.editing === 'true') {
+      return;
+    }
+
+    card.dataset.editing = 'true';
+    card.classList.add('editing');
+    card.innerHTML = '';
+
+    const form = document.createElement('form');
+
+    const input = document.createElement('input');
+    input.type = 'text';
+    input.placeholder = 'Thread name';
+
+    const buttonRow = document.createElement('div');
+    buttonRow.className = 'editor-buttons';
+
+    const addButton = document.createElement('button');
+    addButton.type = 'submit';
+    addButton.className = 'add';
+    addButton.textContent = 'Add';
+
+    const cancelButton = document.createElement('button');
+    cancelButton.type = 'button';
+    cancelButton.className = 'cancel';
+    cancelButton.textContent = 'Cancel';
+
+    buttonRow.appendChild(addButton);
+    buttonRow.appendChild(cancelButton);
+    form.appendChild(input);
+    form.appendChild(buttonRow);
+    card.appendChild(form);
+
+    const resetCard = () => {
+      card.dataset.editing = 'false';
+      card.classList.remove('editing');
+      card.innerHTML = '+ Add thread';
+    };
+
+    const submit = async () => {
+      const success = await createThread(input.value);
+      if (success) {
+        resetCard();
+      }
+    };
+
+    form.addEventListener('submit', (event) => {
+      event.preventDefault();
+      submit().catch((error) => {
+        console.error('Failed to create thread from inline composer', error);
+      });
+    });
+
+    cancelButton.addEventListener('click', (event) => {
+      event.preventDefault();
+      resetCard();
+    });
+
+    input.addEventListener('keydown', (event) => {
+      if (event.key === 'Escape') {
+        event.preventDefault();
+        resetCard();
+      }
+    });
+
+    input.focus();
   }
 
   async function createThread(rawName) {

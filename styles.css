@@ -183,12 +183,72 @@ body {
   cursor: pointer;
   transition: border-color 0.2s, color 0.2s, background 0.2s;
   background: rgba(255, 255, 255, 0.4);
+  padding: 1rem;
 }
 
 .add-thread-card:hover {
   border-color: #3a7afe;
   color: #2a4ecf;
   background: rgba(58, 122, 254, 0.08);
+}
+
+.add-thread-card.editing {
+  border-style: solid;
+  background: #fff;
+  color: #1f1f1f;
+  align-items: stretch;
+}
+
+.add-thread-card.editing form {
+  display: flex;
+  flex-direction: column;
+  gap: 0.6rem;
+  width: 100%;
+}
+
+.add-thread-card.editing input {
+  padding: 0.5rem 0.65rem;
+  border-radius: 6px;
+  border: 1px solid #acb5c7;
+  font-size: 0.95rem;
+}
+
+.add-thread-card.editing input:focus {
+  outline: none;
+  border-color: #3a7afe;
+  box-shadow: 0 0 0 2px rgba(58, 122, 254, 0.2);
+}
+
+.add-thread-card.editing .editor-buttons {
+  display: flex;
+  gap: 0.5rem;
+}
+
+.add-thread-card.editing .editor-buttons button {
+  flex: 1;
+  padding: 0.45rem 0.6rem;
+  border-radius: 6px;
+  border: none;
+  cursor: pointer;
+  font-size: 0.9rem;
+}
+
+.add-thread-card.editing .editor-buttons button.add {
+  background: #3a7afe;
+  color: #fff;
+}
+
+.add-thread-card.editing .editor-buttons button.add:hover {
+  background: #2c60d4;
+}
+
+.add-thread-card.editing .editor-buttons button.cancel {
+  background: #e6e8ee;
+  color: #333;
+}
+
+.add-thread-card.editing .editor-buttons button.cancel:hover {
+  background: #d4d7df;
 }
 
 .placeholder {
