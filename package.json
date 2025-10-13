@@ -18,6 +18,7 @@
     "electron": "^38.2.2"
   },
   "dependencies": {
+    "electron-context-menu": "^3.6.1",
     "marked": "^16.4.0"
   }
 }

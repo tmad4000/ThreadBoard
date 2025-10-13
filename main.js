@@ -1,6 +1,7 @@
 const { app, BrowserWindow, dialog, ipcMain, Menu, shell, clipboard } = require('electron');
 const path = require('path');
 const fs = require('fs');
+const contextMenu = require('electron-context-menu');
 
 let mainWindow;
 let currentFilePath = null;
@@ -20,6 +21,12 @@ function createWindow() {
   });
 
   mainWindow.loadFile('index.html');
+
+  contextMenu({
+    window: mainWindow,
+    showSelectAll: true,
+    showCopyImage: false,
+  });
 
   mainWindow.on('closed', () => {
     mainWindow = null;
