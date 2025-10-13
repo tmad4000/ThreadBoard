@@ -606,16 +606,20 @@
       addHuman.className = 'add-human';
       addHuman.textContent = 'Add Message';
       addHuman.addEventListener('click', async () => {
-        await appendMessage(thread, textarea.value, false);
-        textarea.value = '';
+        const handled = await handleSubmission(thread, textarea.value, false);
+        if (handled) {
+          textarea.value = '';
+        }
       });
 
       const addAi = document.createElement('button');
       addAi.className = 'add-ai';
       addAi.textContent = 'Add AI Reply';
       addAi.addEventListener('click', async () => {
-        await appendMessage(thread, textarea.value, true);
-        textarea.value = '';
+        const handled = await handleSubmission(thread, textarea.value, true);
+        if (handled) {
+          textarea.value = '';
+        }
       });
 
       buttonRow.appendChild(addHuman);
@@ -653,22 +657,32 @@
     });
   }
 
-  async function appendMessage(thread, rawText, isAi) {
+  async function appendMessages(thread, entrySpecs) {
     if (!state.filePath) {
       window.alert('Select a Markdown file first.');
-      return;
+      return false;
     }
 
-    const trimmed = rawText.trim();
-    if (!trimmed) {
-      return;
+    if (!Array.isArray(entrySpecs) || entrySpecs.length === 0) {
+      return false;
+    }
+
+    const prepared = entrySpecs
+      .map((entry) => ({
+        text: typeof entry.text === 'string' ? entry.text : '',
+        isAi: Boolean(entry.isAi),
+      }))
+      .filter((entry) => entry.text.trim().length > 0);
+
+    if (prepared.length === 0) {
+      return false;
     }
 
     const response = await api.readFile();
     if (!response.ok) {
       state.loadError = response.error;
       renderAlerts();
-      return;
+      return false;
     }
 
     state.loadError = null;
@@ -679,33 +693,45 @@
     if (!isMatchingThread(thread, target)) {
       window.alert('Thread not found or it changed externally. Reloading the latest content.');
       await reloadFromDisk();
-      return;
+      return false;
     }
 
-    const messageLines = buildMessageLines(rawText, isAi);
-    if (messageLines.length === 0) {
-      return;
-    }
-
-    let insertIndex = target.end;
     const lowerBound = target.contentStart ?? 0;
-    while (insertIndex > lowerBound && lines[insertIndex - 1] === '') {
-      insertIndex -= 1;
-    }
 
-    lines.splice(insertIndex, 0, ...messageLines);
+    let inserted = false;
+
+    prepared.forEach((entry) => {
+      const messageLines = buildMessageLines(entry.text, entry.isAi);
+      if (messageLines.length === 0) {
+        return;
+      }
+
+      let insertIndex = target.end;
+      while (insertIndex > lowerBound && lines[insertIndex - 1] === '') {
+        insertIndex -= 1;
+      }
+
+      lines.splice(insertIndex, 0, ...messageLines);
+      target.end = insertIndex + messageLines.length;
+      inserted = true;
+    });
+
+    if (!inserted) {
+      return false;
+    }
 
     const newContent = ensureTrailingNewline(lines.join('\n'));
     const writeResult = await api.writeFile(newContent);
     if (!writeResult.ok) {
       state.loadError = writeResult.error;
       renderAlerts();
-      return;
+      return false;
     }
 
     state.loadError = null;
     updateContent(newContent);
     renderAlerts();
+    return true;
   }
 
   function buildMessageLines(rawText, isAi) {
@@ -729,6 +755,133 @@
       }
       return line.startsWith('>') ? line : `> ${line}`;
     });
+  }
+
+  function parseCliTranscript(rawText) {
+    const normalized = normalizeNewlines(rawText);
+    const lines = normalized.split('\n');
+    const entries = [];
+    let current = null;
+    let detected = false;
+
+    const commitCurrent = () => {
+      if (!current) {
+        return;
+      }
+      const text = current.lines.join('\n');
+      if (text.trim().length === 0) {
+        current = null;
+        return;
+      }
+      const type = current.type === 'ai' ? 'ai' : 'human';
+      entries.push({ type, text });
+      current = null;
+    };
+
+    lines.forEach((rawLine) => {
+      const cleaned = rawLine.replace(/\u00a0/g, ' ');
+      const humanMatch = cleaned.match(/^▌\s?(.*)$/);
+      if (humanMatch) {
+        detected = true;
+        commitCurrent();
+        current = { type: 'human', lines: [humanMatch[1] ?? ''] };
+        return;
+      }
+
+      const aiMatch = cleaned.match(/^>\s?(.*)$/);
+      if (aiMatch) {
+        detected = true;
+        if (!current || current.type !== 'ai') {
+          commitCurrent();
+          current = { type: 'ai', lines: [] };
+        }
+        current.lines.push(aiMatch[1] ?? '');
+        return;
+      }
+
+      if (!current) {
+        if (cleaned.trim().length === 0) {
+          return;
+        }
+        current = { type: 'human', lines: [] };
+      }
+
+      current.lines.push(cleaned);
+    });
+
+    commitCurrent();
+
+    return { detected, entries };
+  }
+
+  function stripCliMarkers(rawText) {
+    return normalizeNewlines(rawText)
+      .split('\n')
+      .map((line) => {
+        const cleaned = line.replace(/\u00a0/g, ' ');
+        if (/^▌\s?/.test(cleaned)) {
+          return cleaned.replace(/^▌\s?/, '');
+        }
+        if (/^>\s?/.test(cleaned)) {
+          return cleaned.replace(/^>\s?/, '');
+        }
+        return cleaned;
+      })
+      .join('\n');
+  }
+
+  async function handleSubmission(thread, rawText, defaultIsAi) {
+    if (!state.filePath) {
+      window.alert('Select a Markdown file first.');
+      return false;
+    }
+
+    if (typeof rawText !== 'string') {
+      return false;
+    }
+
+    const trimmed = rawText.trim();
+    if (!trimmed) {
+      return false;
+    }
+
+    const parsed = parseCliTranscript(rawText);
+    if (parsed.detected && parsed.entries.length > 0) {
+      const humanCount = parsed.entries.filter((entry) => entry.type === 'human').length;
+      const aiCount = parsed.entries.filter((entry) => entry.type === 'ai').length;
+      const summaryParts = [];
+      if (humanCount > 0) {
+        summaryParts.push(`${humanCount} human`);
+      }
+      if (aiCount > 0) {
+        summaryParts.push(`${aiCount} AI`);
+      }
+      const summary = summaryParts.join(' and ') || 'messages';
+      const confirmText = `Detected Codex CLI transcript (${summary}). Append to this thread?`;
+
+      if (window.confirm(confirmText)) {
+        const success = await appendMessages(
+          thread,
+          parsed.entries.map((entry) => ({
+            text: entry.text,
+            isAi: entry.type === 'ai',
+          })),
+        );
+        if (success) {
+          setStatusMessage('Imported Codex transcript', 2500);
+        }
+        return success;
+      }
+
+      if (parsed.entries.length === 1) {
+        return appendMessages(thread, [{ text: parsed.entries[0].text, isAi: defaultIsAi }]);
+      }
+
+      const combined = stripCliMarkers(rawText);
+      return appendMessages(thread, [{ text: combined, isAi: defaultIsAi }]);
+    }
+
+    return appendMessages(thread, [{ text: rawText, isAi: defaultIsAi }]);
   }
 
   async function handleDeleteThread(thread) {
