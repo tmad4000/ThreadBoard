@@ -13,3 +13,4 @@ Desire a terminal-style flow where multiple topics can be pursued concurrently�
 - ✅ Exposed slider to resize thread columns and persisted preference.
 - ✅ Hardened HTML export with marked fallback and success toast.
 - 🔜 Explore timeline/board hybrid mode for collapsing threads back into a single chat.
+- 🔜 Support multiple files/windows within a single Threadboard session.
