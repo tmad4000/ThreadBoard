@@ -120,7 +120,8 @@
             <section>
               <h4>Codex Prompt Template</h4>
               <p>Share this with another Codex session to keep the log consistent:</p>
-              <pre><code>Please maintain the running thread log in threadboard.md throughout our conversation.
+              <button id="copy-codex-prompt" type="button" class="copy-button">Copy</button>
+              <pre><code id="codex-prompt-text">Please maintain the running thread log in threadboard.md throughout our conversation.
 
 Guidelines:
 1. The file is partitioned with `---` delimiters. Each section heading must be formatted `## [Thread Title]`.

@@ -34,6 +34,8 @@
     rawClose: document.getElementById('raw-close'),
     guideModal: document.getElementById('guide-modal'),
     guideClose: document.getElementById('guide-close'),
+    copyCodexPrompt: document.getElementById('copy-codex-prompt'),
+    codexPromptText: document.getElementById('codex-prompt-text'),
     delimiterInput: document.getElementById('delimiter-input'),
     threadFormat: document.getElementById('thread-format'),
     columnWidth: document.getElementById('column-width'),
@@ -1210,6 +1212,49 @@ ${body}
     document.documentElement.style.setProperty('--thread-column-width', `${clamped}px`);
   }
 
+  async function copyCodexPrompt() {
+    if (!dom.codexPromptText) {
+      return;
+    }
+    const text = dom.codexPromptText.textContent ?? '';
+
+    try {
+      if (navigator.clipboard && navigator.clipboard.writeText) {
+        await navigator.clipboard.writeText(text);
+        setStatusMessage('Codex prompt copied', 2000);
+      } else {
+        const success = fallbackCopyText(text);
+        if (success) {
+          setStatusMessage('Codex prompt copied', 2000);
+        } else {
+          window.prompt('Copy the Codex prompt:', text);
+        }
+      }
+    } catch (error) {
+      console.warn('Clipboard copy failed, falling back to prompt', error);
+      window.prompt('Copy the Codex prompt:', text);
+    }
+  }
+
+  function fallbackCopyText(text) {
+    const textarea = document.createElement('textarea');
+    textarea.value = text;
+    textarea.style.position = 'fixed';
+    textarea.style.opacity = '0';
+    textarea.style.pointerEvents = 'none';
+    document.body.appendChild(textarea);
+    textarea.focus();
+    textarea.select();
+    let success = false;
+    try {
+      success = document.execCommand('copy');
+    } catch (_err) {
+      success = false;
+    }
+    document.body.removeChild(textarea);
+    return success;
+  }
+
   function updateColumnWidthDisplay() {
     if (dom.columnWidthValue) {
       dom.columnWidthValue.textContent = `${state.columnWidth} px`;
@@ -1338,6 +1383,9 @@ ${body}
     if (dom.columnWidth) {
       dom.columnWidth.addEventListener('input', handleColumnWidthChange);
       dom.columnWidth.addEventListener('change', handleColumnWidthChange);
+    }
+    if (dom.copyCodexPrompt) {
+      dom.copyCodexPrompt.addEventListener('click', copyCodexPrompt);
     }
     document.addEventListener('keydown', handleGlobalKeydown);
 

@@ -394,6 +394,23 @@ body {
   padding: 0;
 }
 
+.copy-button {
+  align-self: flex-end;
+  margin-bottom: 0.4rem;
+  padding: 0.35rem 0.75rem;
+  border-radius: 4px;
+  border: none;
+  background: #3a7afe;
+  color: #fff;
+  cursor: pointer;
+  font-size: 0.85rem;
+  transition: background 0.2s;
+}
+
+.copy-button:hover {
+  background: #2d62d2;
+}
+
 body.modal-open {
   overflow: hidden;
 }
