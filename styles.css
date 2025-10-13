@@ -358,6 +358,20 @@ body {
   font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, 'Liberation Mono', 'Courier New', monospace;
 }
 
+#guide-body pre {
+  background: #f3f4f6;
+  border-radius: 6px;
+  padding: 0.9rem;
+  overflow-x: auto;
+  font-size: 0.9rem;
+  line-height: 1.5;
+}
+
+#guide-body pre code {
+  background: transparent;
+  padding: 0;
+}
+
 body.modal-open {
   overflow: hidden;
 }

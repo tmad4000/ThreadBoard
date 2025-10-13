@@ -116,6 +116,24 @@
                 <li>Export to HTML for quick sharing or archiving.</li>
               </ul>
             </section>
+            <section>
+              <h4>Codex Prompt Template</h4>
+              <p>Share this with another Codex session to keep the log consistent:</p>
+              <pre><code>Please maintain the running thread log in threadboard.md throughout our conversation.
+
+Guidelines:
+1. The file is partitioned with `---` delimiters. Each section heading must be formatted `## [Thread Title]`.
+2. Group messages into a small number of active threads (reuse existing sections when possible; add new ones only when a truly distinct topic emerges).
+3. Under each heading, record both participants’ raw text in chronological order:
+   • User lines are copied verbatim (no prefix).
+   • Assistant lines are the same text but prefixed with `> `.
+4. After every exchange, append the new messages to the appropriate section(s). If a message spans multiple topics, duplicate it under each relevant thread.
+5. Never remove existing content; only append.
+6. Keep the file well-formed Markdown: delimiter line, heading, alternating user/assistant entries, delimiter line, etc.
+
+At the end of the session, the file should reflect the full conversation history, organized by thread with matching format.
+</code></pre>
+            </section>
           </div>
         </div>
       </div>
