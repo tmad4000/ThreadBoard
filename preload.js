@@ -2,17 +2,38 @@ const { contextBridge, ipcRenderer } = require('electron');
 
 let markedPromise;
 
-function getMarked() {
+function escapeHtml(text = '') {
+  return text
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#39;');
+}
+
+function fallbackMarkdown(markdown = '') {
+  return `<pre>${escapeHtml(markdown)}</pre>`;
+}
+
+async function getMarked() {
   if (!markedPromise) {
-    markedPromise = import('marked').then((mod) => {
-      if (mod && typeof mod.marked === 'function') {
-        return mod.marked;
-      }
-      if (mod && typeof mod.default === 'function') {
-        return mod.default;
-      }
-      throw new Error('Marked module did not provide a parser');
-    });
+    markedPromise = import('marked')
+      .then((mod) => {
+        if (mod && typeof mod.marked === 'function') {
+          return mod.marked;
+        }
+        if (mod && typeof mod.default === 'function') {
+          return mod.default;
+        }
+        if (mod && typeof mod.parse === 'function') {
+          return { parse: mod.parse };
+        }
+        throw new Error('Marked module did not provide a parser');
+      })
+      .catch((error) => {
+        console.warn('Failed to load marked for markdown export:', error);
+        return null;
+      });
   }
   return markedPromise;
 }
@@ -51,11 +72,20 @@ contextBridge.exposeInMainWorld('threadboard', {
   },
   exportHtml: (html) => ipcRenderer.invoke('file:export-html', html),
   renderMarkdown: async (markdown) => {
-    const marked = await getMarked();
-    if (typeof marked.parse === 'function') {
-      return marked.parse(markdown ?? '');
+    try {
+      const marked = await getMarked();
+      if (marked) {
+        if (typeof marked.parse === 'function') {
+          return marked.parse(markdown ?? '');
+        }
+        if (typeof marked === 'function') {
+          return marked(markdown ?? '');
+        }
+      }
+    } catch (error) {
+      console.warn('Markdown render failed, using fallback:', error);
     }
-    return marked(markdown ?? '');
+    return fallbackMarkdown(markdown ?? '');
   },
   revealFile: (filePath) => ipcRenderer.invoke('file:reveal', filePath),
   copyFilePath: (filePath) => ipcRenderer.invoke('file:copy-path', filePath),

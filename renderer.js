@@ -1128,6 +1128,8 @@ ${body}
     const result = await api.exportHtml(documentHtml);
     if (!result.ok && !result.canceled) {
       window.alert(`Export failed: ${result.error}`);
+    } else if (result.ok) {
+      setStatusMessage('Exported HTML snapshot', 2500);
     }
   }
 
