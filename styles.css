@@ -169,6 +169,28 @@ body {
   justify-content: center;
 }
 
+.add-thread-card {
+  min-width: var(--thread-column-width);
+  max-width: var(--thread-column-width);
+  flex: 0 0 var(--thread-column-width);
+  border: 2px dashed #b7c0d1;
+  border-radius: 8px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: #62708a;
+  font-size: 0.95rem;
+  cursor: pointer;
+  transition: border-color 0.2s, color 0.2s, background 0.2s;
+  background: rgba(255, 255, 255, 0.4);
+}
+
+.add-thread-card:hover {
+  border-color: #3a7afe;
+  color: #2a4ecf;
+  background: rgba(58, 122, 254, 0.08);
+}
+
 .placeholder {
   font-size: 1.1rem;
   color: #555;

@@ -664,6 +664,24 @@
 
       dom.threadColumns.appendChild(column);
     });
+
+    const addCard = document.createElement('div');
+    addCard.className = 'add-thread-card';
+    addCard.textContent = '+ Add thread';
+    addCard.addEventListener('click', () => {
+      if (!state.filePath) {
+        window.alert('Select a Markdown file first.');
+        return;
+      }
+      const name = window.prompt('New thread name (optional)', '');
+      if (name === null) {
+        return;
+      }
+      createThread(name).catch((error) => {
+        console.error('Failed to create thread from board card', error);
+      });
+    });
+    threadColumns.appendChild(addCard);
   }
 
   function createPlaceholder(message) {
@@ -1064,33 +1082,11 @@
 
   async function handleNewThread(event) {
     event.preventDefault();
-    if (!state.filePath) {
-      window.alert('Select a Markdown file first.');
-      return;
+    const name = dom.newThreadName.value;
+    const success = await createThread(name);
+    if (success) {
+      dom.newThreadName.value = '';
     }
-
-    const threadName = sanitiseThreadName(dom.newThreadName.value);
-    dom.newThreadName.value = '';
-
-    const response = await api.readFile();
-    if (!response.ok) {
-      state.loadError = response.error;
-      renderAlerts();
-      return;
-    }
-
-    state.loadError = null;
-    const format = determineThreadFormat(threadName);
-    const newContent = composeContentWithNewThread(response.content, threadName, format);
-    const writeResult = await api.writeFile(newContent);
-    if (!writeResult.ok) {
-      state.loadError = writeResult.error;
-      renderAlerts();
-      return;
-    }
-
-    updateContent(newContent);
-    renderAlerts();
   }
 
   async function reloadFromDisk() {
@@ -1229,6 +1225,46 @@ ${body}
     if (persist) {
       setStoredSetting(SETTINGS_KEYS.columnWidth, String(state.columnWidth));
     }
+  }
+
+  async function createThread(rawName) {
+    if (!state.filePath) {
+      window.alert('Select a Markdown file first.');
+      return false;
+    }
+
+    const threadName = sanitiseThreadName(rawName);
+
+    const response = await api.readFile();
+    if (!response.ok) {
+      state.loadError = response.error;
+      renderAlerts();
+      return false;
+    }
+
+    state.loadError = null;
+    const format = determineThreadFormat(threadName);
+    const newContent = composeContentWithNewThread(response.content, threadName, format);
+    const writeResult = await api.writeFile(newContent);
+    if (!writeResult.ok) {
+      state.loadError = writeResult.error;
+      renderAlerts();
+      return false;
+    }
+
+    updateContent(newContent);
+    renderAlerts();
+
+    requestAnimationFrame(() => {
+      if (dom.threadColumns) {
+        dom.threadColumns.scrollTo({
+          left: dom.threadColumns.scrollWidth,
+          behavior: 'smooth',
+        });
+      }
+    });
+
+    return true;
   }
 
   function handleColumnWidthChange(event) {
