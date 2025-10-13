@@ -1,0 +1,23 @@
+{
+  "name": "threadboard-markdown-ultra-lite",
+  "version": "0.1.0",
+  "description": "Threadboard Markdown Ultra-Lite Electron app",
+  "main": "main.js",
+  "scripts": {
+    "start": "electron ."
+  },
+  "keywords": [
+    "electron",
+    "markdown",
+    "threads"
+  ],
+  "author": "",
+  "license": "MIT",
+  "type": "commonjs",
+  "devDependencies": {
+    "electron": "^38.2.2"
+  },
+  "dependencies": {
+    "marked": "^16.4.0"
+  }
+}

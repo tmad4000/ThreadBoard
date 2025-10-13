@@ -1,0 +1,37 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta http-equiv="X-UA-Compatible" content="IE=edge" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Threadboard Markdown Ultra-Lite</title>
+    <link rel="stylesheet" href="styles.css" />
+  </head>
+  <body>
+    <div id="app">
+      <header class="top-bar">
+        <div class="file-controls">
+          <button id="open-file">Open Markdown…</button>
+          <button id="create-file">Create Markdown…</button>
+          <button id="export-html" disabled>Export View to HTML…</button>
+        </div>
+        <div class="file-status">
+          <span id="current-file">No file selected</span>
+          <span id="watch-status"></span>
+        </div>
+      </header>
+      <section class="thread-actions">
+        <form id="new-thread-form">
+          <label for="new-thread-name">New thread name</label>
+          <input id="new-thread-name" type="text" placeholder="Leave blank for untitled" />
+          <button type="submit">Add Thread</button>
+        </form>
+      </section>
+      <div id="alerts"></div>
+      <main id="thread-columns" class="thread-columns empty">
+        <div class="placeholder">Select or create a Markdown file to begin.</div>
+      </main>
+    </div>
+    <script src="renderer.js"></script>
+  </body>
+</html>
