@@ -163,6 +163,10 @@
         displayLines.pop();
       }
 
+      const displayName = current.type === 'heading'
+        ? current.name
+        : current.firstLine ?? '';
+
       segments.push({
         order: current.order,
         name: current.name,
@@ -174,6 +178,9 @@
         end: current.end,
         firstLine: current.firstLine,
         previousDelimiterIndex: current.previousDelimiterIndex,
+        lineIndices: current.lineIndices,
+        nonEmptyLineIndex: current.nonEmptyLineIndex,
+        displayName,
       });
 
       current = null;
@@ -190,6 +197,8 @@
         lines: [],
         firstLine: null,
         previousDelimiterIndex: pendingDelimiter?.index ?? null,
+        lineIndices: [],
+        nonEmptyLineIndex: null,
       };
       nextOrder += 1;
       pendingDelimiter = null;
@@ -206,6 +215,8 @@
         lines: [],
         firstLine: null,
         previousDelimiterIndex: fromDelimiter ? pendingDelimiter?.index ?? null : null,
+        lineIndices: [],
+        nonEmptyLineIndex: null,
       };
       nextOrder += 1;
       pendingDelimiter = null;
@@ -244,8 +255,12 @@
       }
 
       current.lines.push(line);
+      current.lineIndices.push(i);
       if (current.firstLine === null && line.trim().length > 0) {
         current.firstLine = line.trim();
+      }
+      if (current.nonEmptyLineIndex === null && line.trim().length > 0) {
+        current.nonEmptyLineIndex = i;
       }
     }
 
@@ -266,6 +281,109 @@
       return original.firstLine === candidate.firstLine;
     }
     return original.type === candidate.type;
+  }
+
+  function beginTitleEdit(thread, headingEl) {
+    if (!state.filePath) {
+      window.alert('Select a Markdown file first.');
+      return;
+    }
+
+    if (!headingEl || headingEl.dataset.editing === 'true') {
+      return;
+    }
+
+    headingEl.dataset.editing = 'true';
+
+    const currentTitle = thread.displayName || '';
+    const input = document.createElement('input');
+    input.type = 'text';
+    input.value = currentTitle;
+    input.className = 'thread-title-input';
+    input.placeholder = '(untitled)';
+
+    const finalize = async (commit) => {
+      if (!input.isConnected) {
+        return;
+      }
+
+      const rawValue = commit ? input.value : currentTitle;
+      const sanitizedValue = commit ? sanitiseThreadName(rawValue) : currentTitle;
+
+      input.replaceWith(headingEl);
+      headingEl.dataset.editing = 'false';
+      headingEl.textContent = sanitizedValue;
+      thread.displayName = sanitizedValue;
+
+      if (commit && sanitizedValue !== currentTitle) {
+        await commitTitleChange(thread, sanitizedValue);
+      }
+    };
+
+    input.addEventListener('blur', () => finalize(true));
+    input.addEventListener('keydown', (event) => {
+      if (event.key === 'Enter') {
+        event.preventDefault();
+        finalize(true);
+      } else if (event.key === 'Escape') {
+        event.preventDefault();
+        finalize(false);
+      }
+    });
+
+    headingEl.replaceWith(input);
+    input.focus();
+    input.select();
+  }
+
+  async function commitTitleChange(thread, newTitle) {
+    const response = await api.readFile();
+    if (!response.ok) {
+      state.loadError = response.error;
+      renderAlerts();
+      return;
+    }
+
+    const content = normalizeNewlines(response.content);
+    const lines = content.split('\n');
+    const segments = parseThreads(content, state.delimiter);
+    const target = segments.find((seg) => seg.order === thread.order);
+
+    if (!isMatchingThread(thread, target)) {
+      window.alert('Could not update title because the thread changed externally. Reloading.');
+      await reloadFromDisk();
+      return;
+    }
+
+    const finalTitle = sanitiseThreadName(newTitle);
+
+    if (target.type === 'heading') {
+      const headingLineIndex = target.headingLine;
+      if (typeof headingLineIndex === 'number') {
+        lines[headingLineIndex] = `## [${finalTitle}]`;
+      }
+    } else {
+      const insertIndex = typeof target.start === 'number' ? target.start : 0;
+      const headingLine = `## [${finalTitle}]`;
+      lines.splice(insertIndex, 0, headingLine);
+
+      const nextIndex = insertIndex + 1;
+      if (nextIndex < lines.length && lines[nextIndex].trim().length > 0) {
+        lines.splice(nextIndex, 0, '');
+      }
+    }
+
+    const newContent = ensureTrailingNewline(lines.join('\n'));
+    const writeResult = await api.writeFile(newContent);
+    if (!writeResult.ok) {
+      state.loadError = writeResult.error;
+      renderAlerts();
+      return;
+    }
+
+    state.loadError = null;
+    setStatusMessage('Title updated', 2000);
+    await reloadFromDisk();
   }
 
   function isRawModalOpen() {
@@ -398,7 +516,9 @@
       header.className = 'thread-header';
 
       const title = document.createElement('h2');
-      title.textContent = thread.name || '';
+      title.textContent = thread.displayName || '';
+      title.dataset.editing = 'false';
+      title.addEventListener('click', () => beginTitleEdit(thread, title));
       header.appendChild(title);
 
       const deleteBtn = document.createElement('button');
@@ -637,7 +757,7 @@
     if (typeof raw !== 'string') {
       return '';
     }
-    return raw.replace(/[\r\n]/g, ' ').replace(/]/g, '').trim();
+    return raw.replace(/[\r\n]/g, ' ').replace(/[\[\]]/g, '').trim();
   }
 
   function composeContentWithNewThread(content, threadName, format) {
