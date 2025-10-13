@@ -36,6 +36,8 @@
     guideClose: document.getElementById('guide-close'),
     copyCodexPrompt: document.getElementById('copy-codex-prompt'),
     codexPromptText: document.getElementById('codex-prompt-text'),
+    copyParsePrompt: document.getElementById('copy-parse-prompt'),
+    parsePromptText: document.getElementById('parse-prompt-text'),
     delimiterInput: document.getElementById('delimiter-input'),
     threadFormat: document.getElementById('thread-format'),
     columnWidth: document.getElementById('column-width'),
@@ -1217,27 +1219,11 @@ ${body}
   }
 
   async function copyCodexPrompt() {
-    if (!dom.codexPromptText) {
-      return;
-    }
-    const text = dom.codexPromptText.textContent ?? '';
+    await copyTextWithFeedback(dom.codexPromptText?.textContent ?? '', 'Codex prompt copied');
+  }
 
-    try {
-      if (navigator.clipboard && navigator.clipboard.writeText) {
-        await navigator.clipboard.writeText(text);
-        setStatusMessage('Codex prompt copied', 2000);
-      } else {
-        const success = fallbackCopyText(text);
-        if (success) {
-          setStatusMessage('Codex prompt copied', 2000);
-        } else {
-          window.prompt('Copy the Codex prompt:', text);
-        }
-      }
-    } catch (error) {
-      console.warn('Clipboard copy failed, falling back to prompt', error);
-      window.prompt('Copy the Codex prompt:', text);
-    }
+  async function copyParsePrompt() {
+    await copyTextWithFeedback(dom.parsePromptText?.textContent ?? '', 'Parsing prompt copied');
   }
 
   function fallbackCopyText(text) {
@@ -1257,6 +1243,29 @@ ${body}
     }
     document.body.removeChild(textarea);
     return success;
+  }
+
+  async function copyTextWithFeedback(text, message) {
+    if (!text) {
+      return;
+    }
+
+    try {
+      if (navigator.clipboard && navigator.clipboard.writeText) {
+        await navigator.clipboard.writeText(text);
+        setStatusMessage(message, 2000);
+      } else {
+        const success = fallbackCopyText(text);
+        if (success) {
+          setStatusMessage(message, 2000);
+        } else {
+          window.prompt('Copy the text below:', text);
+        }
+      }
+    } catch (error) {
+      console.warn('Clipboard copy failed, falling back to prompt', error);
+      window.prompt('Copy the text below:', text);
+    }
   }
 
   function updateColumnWidthDisplay() {
@@ -1459,6 +1468,9 @@ ${body}
     }
     if (dom.copyCodexPrompt) {
       dom.copyCodexPrompt.addEventListener('click', copyCodexPrompt);
+    }
+    if (dom.copyParsePrompt) {
+      dom.copyParsePrompt.addEventListener('click', copyParsePrompt);
     }
     document.addEventListener('keydown', handleGlobalKeydown);
 

@@ -136,6 +136,32 @@ Guidelines:
 At the end of the session, the file should reflect the full conversation history, organized by thread with matching format.
 </code></pre>
             </section>
+            <section>
+              <h4>Thread Parsing Prompt</h4>
+              <p>Use this when you want Codex/GPT to split a raw transcript into threadboard format:</p>
+              <button id="copy-parse-prompt" type="button" class="copy-button">Copy</button>
+              <pre><code id="parse-prompt-text">You are ThreadBoard, responsible for organizing chat transcripts into thematic threads.
+
+Input: I will paste raw conversation lines (chronological). Each line begins with either “User:” or “Assistant:”.
+
+Task:
+1. Analyze the conversation and identify the minimal set of coherent threads (aim for ~3 unless the content clearly demands more).
+2. Create `threadboard.md` with the following structure:
+   ---
+   ## [Thread Title]
+   User: ...
+   > Assistant: ...
+   ---
+   (repeat sections for each thread)
+3. Place each message in every thread it belongs to (duplicate entries if a message spans topics). Preserve the original text.
+4. Only add `> ` in front of assistant lines.
+5. When unsure which thread to use, prefer the closest thematic match rather than creating new ones.
+
+Output: the complete markdown file contents.
+
+Now, please wait for the transcript.
+</code></pre>
+            </section>
           </div>
         </div>
       </div>
