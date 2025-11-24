@@ -28,6 +28,15 @@
           <span id="watch-status"></span>
         </div>
       </header>
+      <div id="search-panel" class="search-panel" aria-hidden="true">
+        <input id="search-input" type="text" placeholder="Search threads…" autocomplete="off" />
+        <span id="search-count" class="search-count"></span>
+        <div class="search-buttons">
+          <button id="search-prev" type="button" aria-label="Previous match">&#x2039;</button>
+          <button id="search-next" type="button" aria-label="Next match">&#x203a;</button>
+          <button id="search-close" type="button" aria-label="Close search">&#x00d7;</button>
+        </div>
+      </div>
       <section class="thread-actions">
         <form id="new-thread-form">
           <label for="new-thread-name">New thread name</label>

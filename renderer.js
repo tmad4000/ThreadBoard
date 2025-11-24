@@ -13,6 +13,10 @@
     threadFormat: 'auto',
     statusMessage: '',
     columnWidth: 320,
+    searchQuery: '',
+    searchMatches: [],
+    searchIndex: -1,
+    searchOpen: false,
   };
 
   const dom = {
@@ -42,6 +46,12 @@
     threadFormat: document.getElementById('thread-format'),
     columnWidth: document.getElementById('column-width'),
     columnWidthValue: document.getElementById('column-width-value'),
+    searchPanel: document.getElementById('search-panel'),
+    searchInput: document.getElementById('search-input'),
+    searchCount: document.getElementById('search-count'),
+    searchPrev: document.getElementById('search-prev'),
+    searchNext: document.getElementById('search-next'),
+    searchClose: document.getElementById('search-close'),
   };
 
   const newThreadButton = dom.newThreadForm.querySelector('button[type="submit"]');
@@ -470,6 +480,7 @@
       closeRawModal();
     }
     if (!state.filePath) {
+      closeSearchPanel();
       state.statusMessage = '';
       if (statusTimeoutId) {
         clearTimeout(statusTimeoutId);
@@ -558,6 +569,11 @@
       dom.rawText.value = state.content;
     }
     renderThreads();
+    if (state.searchOpen && state.searchQuery.trim()) {
+      refreshSearchMatches({ preserveIndex: true });
+    } else if (!state.searchQuery.trim()) {
+      clearSearchHighlights();
+    }
     updateControlsState();
   }
 
@@ -1285,6 +1301,182 @@ ${body}
     }
   }
 
+  function openSearchPanel({ selectText = true } = {}) {
+    if (!dom.searchPanel) {
+      return;
+    }
+    state.searchOpen = true;
+    dom.searchPanel.classList.add('visible');
+    dom.searchPanel.setAttribute('aria-hidden', 'false');
+    if (dom.searchInput) {
+      dom.searchInput.value = state.searchQuery;
+      dom.searchInput.focus();
+      if (selectText) {
+        dom.searchInput.select();
+      }
+    }
+    if (state.searchQuery.trim()) {
+      refreshSearchMatches({ preserveIndex: true });
+    } else {
+      updateSearchCount();
+    }
+  }
+
+  function closeSearchPanel({ resetQuery = true } = {}) {
+    if (!dom.searchPanel) {
+      return;
+    }
+    state.searchOpen = false;
+    dom.searchPanel.classList.remove('visible');
+    dom.searchPanel.setAttribute('aria-hidden', 'true');
+    if (resetQuery) {
+      state.searchQuery = '';
+      if (dom.searchInput) {
+        dom.searchInput.value = '';
+      }
+    }
+    state.searchMatches = [];
+    state.searchIndex = -1;
+    clearSearchHighlights();
+    updateSearchCount();
+  }
+
+  function clearSearchHighlights() {
+    if (!dom.threadColumns) {
+      return;
+    }
+    dom.threadColumns
+      .querySelectorAll('.search-hit, .search-hit-active')
+      .forEach((node) => node.classList.remove('search-hit', 'search-hit-active'));
+  }
+
+  function updateSearchCount() {
+    const trimmed = state.searchQuery.trim();
+    if (dom.searchCount) {
+      if (!trimmed) {
+        dom.searchCount.textContent = '';
+      } else if (state.searchMatches.length === 0) {
+        dom.searchCount.textContent = '0 / 0';
+      } else {
+        dom.searchCount.textContent = `${state.searchIndex + 1} / ${state.searchMatches.length}`;
+      }
+    }
+    const disableNav = !trimmed || state.searchMatches.length === 0;
+    if (dom.searchPrev) {
+      dom.searchPrev.disabled = disableNav;
+    }
+    if (dom.searchNext) {
+      dom.searchNext.disabled = disableNav;
+    }
+  }
+
+  function setActiveSearchMatch(index, { scroll = true } = {}) {
+    if (state.searchMatches.length === 0) {
+      state.searchIndex = -1;
+      updateSearchCount();
+      return;
+    }
+
+    state.searchMatches.forEach((node) => node.classList.remove('search-hit-active'));
+
+    if (index < 0 || index >= state.searchMatches.length) {
+      state.searchIndex = -1;
+      updateSearchCount();
+      return;
+    }
+
+    state.searchIndex = index;
+    const node = state.searchMatches[index];
+    if (node) {
+      node.classList.add('search-hit-active');
+      if (scroll) {
+        node.scrollIntoView({ block: 'center', behavior: 'smooth' });
+      }
+    }
+    updateSearchCount();
+  }
+
+  function refreshSearchMatches({ preserveIndex = false } = {}) {
+    if (!state.searchOpen) {
+      clearSearchHighlights();
+      state.searchMatches = [];
+      state.searchIndex = -1;
+      updateSearchCount();
+      return;
+    }
+
+    const query = state.searchQuery.trim();
+    clearSearchHighlights();
+    if (!query || !dom.threadColumns) {
+      state.searchMatches = [];
+      state.searchIndex = -1;
+      updateSearchCount();
+      return;
+    }
+
+    const lowerQuery = query.toLowerCase();
+    const nodes = dom.threadColumns.querySelectorAll('.thread-header h2, .message-list .message');
+    const matches = [];
+    nodes.forEach((node) => {
+      if (node.textContent.toLowerCase().includes(lowerQuery)) {
+        node.classList.add('search-hit');
+        matches.push(node);
+      }
+    });
+    state.searchMatches = matches;
+
+    if (matches.length === 0) {
+      state.searchIndex = -1;
+      updateSearchCount();
+      return;
+    }
+
+    const targetIndex = preserveIndex && state.searchIndex >= 0
+      ? Math.min(state.searchIndex, matches.length - 1)
+      : 0;
+    setActiveSearchMatch(targetIndex, { scroll: !preserveIndex });
+  }
+
+  function stepSearch(delta) {
+    if (!state.searchOpen || state.searchMatches.length === 0) {
+      return;
+    }
+    const total = state.searchMatches.length;
+    const current = state.searchIndex >= 0 ? state.searchIndex : 0;
+    const nextIndex = (current + delta + total) % total;
+    setActiveSearchMatch(nextIndex);
+  }
+
+  function focusNextSearchMatch() {
+    stepSearch(1);
+  }
+
+  function focusPreviousSearchMatch() {
+    stepSearch(-1);
+  }
+
+  function handleSearchInput(event) {
+    state.searchQuery = event.target.value || '';
+    refreshSearchMatches({ preserveIndex: false });
+  }
+
+  function handleSearchInputKeydown(event) {
+    if (event.key === 'Enter') {
+      event.preventDefault();
+      if (event.shiftKey) {
+        focusPreviousSearchMatch();
+      } else {
+        focusNextSearchMatch();
+      }
+      return;
+    }
+
+    if (event.key === 'Escape') {
+      event.preventDefault();
+      closeSearchPanel();
+    }
+  }
+
   function startInlineThreadComposer(card) {
     if (card.dataset.editing === 'true') {
       return;
@@ -1403,19 +1595,38 @@ ${body}
   }
 
   function handleGlobalKeydown(event) {
-    if (event.key !== 'Escape') {
+    const key = typeof event.key === 'string' ? event.key.toLowerCase() : '';
+    const isCmdOrCtrl = event.metaKey || event.ctrlKey;
+
+    if (isCmdOrCtrl && !event.altKey && key === 'f') {
+      event.preventDefault();
+      if (state.searchOpen) {
+        dom.searchInput?.focus();
+        dom.searchInput?.select();
+      } else {
+        openSearchPanel();
+      }
       return;
     }
 
-    if (isRawModalOpen()) {
-      event.stopPropagation();
-      closeRawModal();
-      return;
-    }
+    if (event.key === 'Escape') {
+      if (state.searchOpen) {
+        event.stopPropagation();
+        event.preventDefault();
+        closeSearchPanel();
+        return;
+      }
 
-    if (isGuideModalOpen()) {
-      event.stopPropagation();
-      closeGuideModal();
+      if (isRawModalOpen()) {
+        event.stopPropagation();
+        closeRawModal();
+        return;
+      }
+
+      if (isGuideModalOpen()) {
+        event.stopPropagation();
+        closeGuideModal();
+      }
     }
   }
 
@@ -1471,6 +1682,28 @@ ${body}
     }
     if (dom.copyParsePrompt) {
       dom.copyParsePrompt.addEventListener('click', copyParsePrompt);
+    }
+    if (dom.searchInput) {
+      dom.searchInput.addEventListener('input', handleSearchInput);
+      dom.searchInput.addEventListener('keydown', handleSearchInputKeydown);
+    }
+    if (dom.searchClose) {
+      dom.searchClose.addEventListener('click', (event) => {
+        event.preventDefault();
+        closeSearchPanel();
+      });
+    }
+    if (dom.searchNext) {
+      dom.searchNext.addEventListener('click', (event) => {
+        event.preventDefault();
+        focusNextSearchMatch();
+      });
+    }
+    if (dom.searchPrev) {
+      dom.searchPrev.addEventListener('click', (event) => {
+        event.preventDefault();
+        focusPreviousSearchMatch();
+      });
     }
     document.addEventListener('keydown', handleGlobalKeydown);
 
