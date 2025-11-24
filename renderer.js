@@ -42,6 +42,8 @@
     codexPromptText: document.getElementById('codex-prompt-text'),
     copyParsePrompt: document.getElementById('copy-parse-prompt'),
     parsePromptText: document.getElementById('parse-prompt-text'),
+    copyNotesPrompt: document.getElementById('copy-notes-prompt'),
+    notesPromptText: document.getElementById('notes-prompt-text'),
     delimiterInput: document.getElementById('delimiter-input'),
     threadFormat: document.getElementById('thread-format'),
     columnWidth: document.getElementById('column-width'),
@@ -1242,6 +1244,10 @@ ${body}
     await copyTextWithFeedback(dom.parsePromptText?.textContent ?? '', 'Parsing prompt copied');
   }
 
+  async function copyNotesPrompt() {
+    await copyTextWithFeedback(dom.notesPromptText?.textContent ?? '', 'Notes prompt copied');
+  }
+
   function fallbackCopyText(text) {
     const textarea = document.createElement('textarea');
     textarea.value = text;
@@ -1682,6 +1688,9 @@ ${body}
     }
     if (dom.copyParsePrompt) {
       dom.copyParsePrompt.addEventListener('click', copyParsePrompt);
+    }
+    if (dom.copyNotesPrompt) {
+      dom.copyNotesPrompt.addEventListener('click', copyNotesPrompt);
     }
     if (dom.searchInput) {
       dom.searchInput.addEventListener('input', handleSearchInput);
