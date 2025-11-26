@@ -4,7 +4,20 @@
   "description": "Threadboard Markdown Ultra-Lite Electron app",
   "main": "main.js",
   "scripts": {
-    "start": "electron ."
+    "start": "electron .",
+    "build": "electron-builder --mac"
+  },
+  "build": {
+    "appId": "com.threadboard.app",
+    "productName": "ThreadBoard",
+    "mac": {
+      "category": "public.app-category.productivity",
+      "target": "dmg"
+    },
+    "files": [
+      "**/*",
+      "!*.command"
+    ]
   },
   "keywords": [
     "electron",
@@ -15,7 +28,8 @@
   "license": "MIT",
   "type": "commonjs",
   "devDependencies": {
-    "electron": "^38.2.2"
+    "electron": "^38.2.2",
+    "electron-builder": "^26.0.12"
   },
   "dependencies": {
     "electron-context-menu": "^3.6.1",
