@@ -936,22 +936,6 @@
     return { detected, entries };
   }
 
-  function stripCliMarkers(rawText) {
-    return normalizeNewlines(rawText)
-      .split('\n')
-      .map((line) => {
-        const cleaned = line.replace(/\u00a0/g, ' ');
-        if (/^▌\s?/.test(cleaned)) {
-          return cleaned.replace(/^▌\s?/, '');
-        }
-        if (/^>\s?/.test(cleaned)) {
-          return cleaned.replace(/^>\s?/, '');
-        }
-        return cleaned;
-      })
-      .join('\n');
-  }
-
   async function handleSubmission(thread, rawText, defaultIsAi) {
     if (!state.filePath) {
       window.alert('Select a Markdown file first.');
@@ -995,12 +979,8 @@
         return success;
       }
 
-      if (parsed.entries.length === 1) {
-        return appendMessages(thread, [{ text: parsed.entries[0].text, isAi: defaultIsAi }]);
-      }
-
-      const combined = stripCliMarkers(rawText);
-      return appendMessages(thread, [{ text: combined, isAi: defaultIsAi }]);
+      // User declined auto-split, keep text as-is (preserving > markers)
+      return appendMessages(thread, [{ text: rawText, isAi: defaultIsAi }]);
     }
 
     return appendMessages(thread, [{ text: rawText, isAi: defaultIsAi }]);
