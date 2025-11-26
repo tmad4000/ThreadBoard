@@ -706,6 +706,15 @@ button.add-ai:hover {
   transition: background 0.2s;
 }
 
+#import-load {
+  background: #00a86b;
+  color: #fff;
+}
+
+#import-load:hover {
+  background: #008756;
+}
+
 #import-save-new {
   background: #3a7afe;
   color: #fff;
@@ -713,20 +722,6 @@ button.add-ai:hover {
 
 #import-save-new:hover {
   background: #2d62d2;
-}
-
-#import-add-thread {
-  background: #00a86b;
-  color: #fff;
-}
-
-#import-add-thread:hover:not(:disabled) {
-  background: #008756;
-}
-
-#import-add-thread:disabled {
-  background: #999;
-  cursor: not-allowed;
 }
 
 @media (max-width: 900px) {

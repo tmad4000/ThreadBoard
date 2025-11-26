@@ -17,6 +17,7 @@
     searchMatches: [],
     searchIndex: -1,
     searchOpen: false,
+    unsaved: false,
   };
 
   const dom = {
@@ -58,8 +59,8 @@
     importModal: document.getElementById('import-modal'),
     importClose: document.getElementById('import-close'),
     importTextArea: document.getElementById('import-text-area'),
+    importLoad: document.getElementById('import-load'),
     importSaveNew: document.getElementById('import-save-new'),
-    importAddThread: document.getElementById('import-add-thread'),
   };
 
   const newThreadButton = dom.newThreadForm.querySelector('button[type="submit"]');
@@ -443,7 +444,7 @@
   }
 
   function openRawModal() {
-    if (!dom.rawModal || !state.filePath) {
+    if (!dom.rawModal || (!state.filePath && !state.unsaved)) {
       return;
     }
     if (dom.rawText) {
@@ -493,7 +494,6 @@
     if (dom.importTextArea) {
       dom.importTextArea.value = '';
     }
-    updateImportAddThreadButton();
     dom.importModal.classList.add('open');
     refreshModalState();
     if (dom.importTextArea) {
@@ -507,12 +507,6 @@
     }
     dom.importModal.classList.remove('open');
     refreshModalState();
-  }
-
-  function updateImportAddThreadButton() {
-    if (dom.importAddThread) {
-      dom.importAddThread.disabled = !state.filePath;
-    }
   }
 
   function setFilePath(filePath) {
@@ -534,10 +528,17 @@
 
   function updateFileStatus() {
     if (!state.filePath) {
-      dom.currentFile.textContent = 'No file selected';
-      dom.currentFile.removeAttribute('title');
-      dom.watchStatus.textContent = '';
-      dom.watchStatus.removeAttribute('title');
+      if (state.unsaved) {
+        dom.currentFile.textContent = 'Unsaved content';
+        dom.currentFile.removeAttribute('title');
+        dom.watchStatus.textContent = 'Use "Create Markdown…" to save';
+        dom.watchStatus.removeAttribute('title');
+      } else {
+        dom.currentFile.textContent = 'No file selected';
+        dom.currentFile.removeAttribute('title');
+        dom.watchStatus.textContent = '';
+        dom.watchStatus.removeAttribute('title');
+      }
       if (dom.copyPath) {
         dom.copyPath.removeAttribute('title');
       }
@@ -571,11 +572,12 @@
 
   function updateControlsState() {
     const hasFile = Boolean(state.filePath);
-    dom.exportHtml.disabled = !hasFile;
-    dom.newThreadName.disabled = !hasFile;
-    newThreadButton.disabled = !hasFile;
+    const hasContent = hasFile || state.unsaved;
+    dom.exportHtml.disabled = !hasContent;
+    dom.newThreadName.disabled = !hasContent;
+    newThreadButton.disabled = !hasContent;
     if (dom.viewRaw) {
-      dom.viewRaw.disabled = !hasFile;
+      dom.viewRaw.disabled = !hasContent;
     }
     if (dom.revealFile) {
       dom.revealFile.disabled = !hasFile;
@@ -584,7 +586,7 @@
       dom.copyPath.disabled = !hasFile;
     }
     if (dom.threadFormat) {
-      dom.threadFormat.disabled = !hasFile;
+      dom.threadFormat.disabled = !hasContent;
       if (dom.threadFormat.value !== state.threadFormat) {
         dom.threadFormat.value = state.threadFormat;
       }
@@ -599,7 +601,7 @@
       }
     }
     updateColumnWidthDisplay();
-    dom.threadColumns.classList.toggle('empty', !hasFile || state.threads.length === 0);
+    dom.threadColumns.classList.toggle('empty', !hasContent || state.threads.length === 0);
   }
 
   function updateContent(content) {
@@ -623,6 +625,7 @@
       return;
     }
     state.watchError = null;
+    state.unsaved = false;
     setFilePath(result.filePath);
     updateContent(result.content || '');
     renderAlerts();
@@ -632,7 +635,9 @@
     const { threadColumns } = dom;
     threadColumns.innerHTML = '';
 
-    if (!state.filePath) {
+    const hasContent = state.filePath || state.unsaved;
+
+    if (!hasContent) {
       const placeholder = createPlaceholder('Select or create a Markdown file to begin.');
       threadColumns.appendChild(placeholder);
       threadColumns.classList.add('empty');
@@ -1303,54 +1308,27 @@ ${body}
     }
   }
 
-  async function handleImportAddThread() {
-    if (!state.filePath) {
-      window.alert('Please open a file first.');
-      return;
-    }
-
+  function handleImportLoad() {
     const text = dom.importTextArea?.value ?? '';
     if (!text.trim()) {
       window.alert('Please paste some text first.');
       return;
     }
 
-    const response = await api.readFile();
-    if (!response.ok) {
-      state.loadError = response.error;
-      renderAlerts();
-      return;
-    }
+    const content = ensureTrailingNewline(normalizeNewlines(text));
 
-    const existingContent = normalizeNewlines(response.content);
-    const newContent = composeContentWithNewThread(existingContent, '', 'delimiter');
-
-    // Append the pasted text after the new thread delimiter
-    const lines = newContent.split('\n');
-    const pastedLines = normalizeNewlines(text).split('\n');
-
-    // Find the last delimiter and insert after
-    let insertIndex = lines.length;
-    for (let i = lines.length - 1; i >= 0; i--) {
-      if (lines[i].trim() === state.delimiter.trim()) {
-        insertIndex = i + 1;
-        break;
-      }
-    }
-
-    lines.splice(insertIndex, 0, ...pastedLines);
-    const finalContent = ensureTrailingNewline(lines.join('\n'));
-
-    const writeResult = await api.writeFile(finalContent);
-    if (!writeResult.ok) {
-      state.loadError = writeResult.error;
-      renderAlerts();
-      return;
-    }
+    // Clear any existing file association
+    state.filePath = null;
+    state.unsaved = true;
+    state.watchError = null;
+    state.loadError = null;
 
     closeImportModal();
-    updateContent(finalContent);
-    setStatusMessage('Added as new thread', 2500);
+    updateContent(content);
+    updateFileStatus();
+    updateControlsState();
+    renderAlerts();
+    setStatusMessage('Content loaded - use "Create Markdown…" to save', 3000);
   }
 
   function fallbackCopyText(text) {
@@ -1816,11 +1794,11 @@ ${body}
         }
       });
     }
+    if (dom.importLoad) {
+      dom.importLoad.addEventListener('click', handleImportLoad);
+    }
     if (dom.importSaveNew) {
       dom.importSaveNew.addEventListener('click', handleImportSaveNew);
-    }
-    if (dom.importAddThread) {
-      dom.importAddThread.addEventListener('click', handleImportAddThread);
     }
     if (dom.searchInput) {
       dom.searchInput.addEventListener('input', handleSearchInput);
@@ -1883,6 +1861,17 @@ ${body}
   }
 
   async function handleCreateFile() {
+    // If we have unsaved content, save it to the new file
+    if (state.unsaved && state.content) {
+      const result = await api.saveNewFile(state.content);
+      if (result && !result.canceled) {
+        state.unsaved = false;
+        applyOpenedFile(result);
+        setStatusMessage('Saved to file', 2500);
+      }
+      return;
+    }
+
     const result = await api.createFile();
     if (!result || result.canceled) {
       return;
