@@ -17,6 +17,7 @@
             <button id="export-html" disabled>Export View to HTML…</button>
           </div>
           <div class="utility-controls">
+            <button id="import-text" type="button">Import Text…</button>
             <button id="view-raw" disabled>View Raw Markdown</button>
             <button id="reveal-file" disabled>Reveal in Finder</button>
             <button id="copy-path" disabled>Copy Path</button>
@@ -199,6 +200,20 @@ Output: the complete markdown file contents, maintaining the original language a
 Now, please paste the notes to organize.
 </code></pre>
             </section>
+          </div>
+        </div>
+      </div>
+      <div id="import-modal" class="modal">
+        <div class="modal-inner">
+          <div class="modal-header">
+            <h3>Import Text</h3>
+            <button id="import-close" type="button">Close</button>
+          </div>
+          <p class="import-hint">Paste terminal output, notes, or any text below. You can save it as a new Markdown file or add it to the current file.</p>
+          <textarea id="import-text-area" placeholder="Paste text here…"></textarea>
+          <div class="import-actions">
+            <button id="import-save-new" type="button">Save as New File…</button>
+            <button id="import-add-thread" type="button" disabled>Add as Thread to Current File</button>
           </div>
         </div>
       </div>

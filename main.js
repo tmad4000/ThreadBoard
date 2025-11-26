@@ -409,6 +409,30 @@ ipcMain.handle('file:copy-path', (_event, filePath) => {
   }
 });
 
+ipcMain.handle('file:save-new', async (_event, content) => {
+  const { canceled, filePath } = await dialog.showSaveDialog({
+    title: 'Save as Markdown file',
+    defaultPath: 'imported.md',
+    filters: [
+      { name: 'Markdown', extensions: ['md', 'markdown'] },
+      { name: 'All Files', extensions: ['*'] },
+    ],
+  });
+
+  if (canceled || !filePath) {
+    return { canceled: true };
+  }
+
+  try {
+    await fs.promises.writeFile(filePath, content, 'utf8');
+    setCurrentFile(filePath);
+    await touchRecentFile(filePath);
+    return { canceled: false, filePath, content };
+  } catch (error) {
+    return { ok: false, error: error.message };
+  }
+});
+
 ipcMain.on('quit-app', () => {
   app.quit();
 });

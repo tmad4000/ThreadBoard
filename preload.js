@@ -94,5 +94,6 @@ contextBridge.exposeInMainWorld('threadboard', {
   },
   revealFile: (filePath) => ipcRenderer.invoke('file:reveal', filePath),
   copyFilePath: (filePath) => ipcRenderer.invoke('file:copy-path', filePath),
+  saveNewFile: (content) => ipcRenderer.invoke('file:save-new', content),
   quit: () => ipcRenderer.send('quit-app'),
 });
