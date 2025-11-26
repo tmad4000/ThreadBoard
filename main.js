@@ -3,17 +3,16 @@ const path = require('path');
 const fs = require('fs');
 const contextMenu = require('electron-context-menu');
 
-let mainWindow;
-let currentFilePath = null;
-let fileWatcher = null;
-let changeDebounce = null;
 let recentFiles = [];
 let recentFilesPath = null;
 
 const RECENT_MAX = 10;
 
+// Track per-window state
+const windowState = new Map();
+
 function createWindow() {
-  mainWindow = new BrowserWindow({
+  const win = new BrowserWindow({
     width: 1280,
     height: 800,
     minWidth: 900,
@@ -24,67 +23,94 @@ function createWindow() {
     },
   });
 
-  mainWindow.loadFile('index.html');
+  // Initialize per-window state
+  windowState.set(win.id, {
+    filePath: null,
+    fileWatcher: null,
+    changeDebounce: null,
+  });
+
+  win.loadFile('index.html');
 
   contextMenu({
-    window: mainWindow,
+    window: win,
     showSelectAll: true,
     showCopyImage: false,
   });
 
-  mainWindow.on('closed', () => {
-    mainWindow = null;
-    clearWatcher();
+  win.on('closed', () => {
+    const state = windowState.get(win.id);
+    if (state && state.fileWatcher) {
+      state.fileWatcher.close();
+    }
+    windowState.delete(win.id);
   });
+
+  return win;
 }
 
-function clearWatcher() {
-  if (fileWatcher) {
-    fileWatcher.close();
-    fileWatcher = null;
+function getWindowState(win) {
+  if (!win) return null;
+  return windowState.get(win.id);
+}
+
+function clearWatcher(win) {
+  const state = getWindowState(win);
+  if (state && state.fileWatcher) {
+    state.fileWatcher.close();
+    state.fileWatcher = null;
   }
 }
 
-function notifyRenderer(channel, payload) {
-  if (mainWindow && !mainWindow.isDestroyed()) {
-    mainWindow.webContents.send(channel, payload);
+function notifyRenderer(win, channel, payload) {
+  if (win && !win.isDestroyed()) {
+    win.webContents.send(channel, payload);
   }
 }
 
-function setupWatcher(filePath) {
-  clearWatcher();
-  if (!filePath) return;
+function setupWatcher(win, filePath) {
+  clearWatcher(win);
+  const state = getWindowState(win);
+  if (!filePath || !state) return;
 
   try {
-    fileWatcher = fs.watch(filePath, { persistent: true }, (eventType) => {
-      if (changeDebounce) {
-        clearTimeout(changeDebounce);
+    state.fileWatcher = fs.watch(filePath, { persistent: true }, (eventType) => {
+      if (state.changeDebounce) {
+        clearTimeout(state.changeDebounce);
       }
-      changeDebounce = setTimeout(() => {
-        notifyRenderer('file-changed', { eventType });
+      state.changeDebounce = setTimeout(() => {
+        notifyRenderer(win, 'file-changed', { eventType });
         if (eventType === 'rename') {
           // Re-establish the watcher after a short delay in case the file was replaced.
-          setTimeout(() => setupWatcher(filePath), 200);
+          setTimeout(() => setupWatcher(win, filePath), 200);
         }
       }, 60);
     });
 
-    fileWatcher.on('error', (error) => {
-      notifyRenderer('file-watch-error', error.message);
+    state.fileWatcher.on('error', (error) => {
+      notifyRenderer(win, 'file-watch-error', error.message);
     });
   } catch (error) {
-    notifyRenderer('file-watch-error', error.message);
+    notifyRenderer(win, 'file-watch-error', error.message);
   }
 }
 
-function setCurrentFile(filePath) {
-  currentFilePath = filePath || null;
-  setupWatcher(currentFilePath);
-  notifyRenderer('file-selected', currentFilePath);
+function setCurrentFile(win, filePath) {
+  const state = getWindowState(win);
+  if (state) {
+    state.filePath = filePath || null;
+  }
+  setupWatcher(win, filePath);
+  notifyRenderer(win, 'file-selected', filePath);
 }
 
-async function readFileContent(filePath) {
-  const targetPath = filePath || currentFilePath;
+function getCurrentFilePath(win) {
+  const state = getWindowState(win);
+  return state ? state.filePath : null;
+}
+
+async function readFileContent(win, filePath) {
+  const targetPath = filePath || getCurrentFilePath(win);
   if (!targetPath) {
     throw new Error('No file selected');
   }
@@ -119,17 +145,18 @@ function getMenuTemplate() {
       label: 'File',
       submenu: [
         {
-          label: 'Open…',
-          accelerator: 'CmdOrCtrl+O',
-          click: async () => {
-            notifyRenderer('menu-open-file');
+          label: 'New Window',
+          accelerator: 'CmdOrCtrl+N',
+          click: () => {
+            createWindow();
           },
         },
         {
-          label: 'Create…',
-          accelerator: 'CmdOrCtrl+N',
+          label: 'Open…',
+          accelerator: 'CmdOrCtrl+O',
           click: async () => {
-            notifyRenderer('menu-create-file');
+            const win = BrowserWindow.getFocusedWindow();
+            if (win) notifyRenderer(win, 'menu-open-file');
           },
         },
         {
@@ -216,11 +243,13 @@ ${filePath}`);
     return;
   }
 
+  const win = BrowserWindow.getFocusedWindow() || createWindow();
+
   try {
     const content = await fs.promises.readFile(filePath, 'utf8');
     await touchRecentFile(filePath);
-    setCurrentFile(filePath);
-    notifyRenderer('file-opened-direct', { filePath, content });
+    setCurrentFile(win, filePath);
+    notifyRenderer(win, 'file-opened-direct', { filePath, content });
   } catch (error) {
     dialog.showErrorBox('Failed to open file', error.message);
   }
@@ -254,7 +283,8 @@ app.on('window-all-closed', () => {
   }
 });
 
-ipcMain.handle('dialog:openFile', async () => {
+ipcMain.handle('dialog:openFile', async (event) => {
+  const win = BrowserWindow.fromWebContents(event.sender);
   const { canceled, filePaths } = await dialog.showOpenDialog({
     title: 'Open Threadboard Markdown file',
     filters: [
@@ -271,19 +301,20 @@ ipcMain.handle('dialog:openFile', async () => {
   const filePath = filePaths[0];
   let content = '';
   try {
-    content = await readFileContent(filePath);
+    content = await readFileContent(win, filePath);
   } catch (error) {
     // If the file does not exist yet, create it lazily.
     await fs.promises.writeFile(filePath, '', 'utf8');
     content = '';
   }
 
-  setCurrentFile(filePath);
+  setCurrentFile(win, filePath);
   await touchRecentFile(filePath);
   return { canceled: false, filePath, content };
 });
 
-ipcMain.handle('dialog:createFile', async () => {
+ipcMain.handle('dialog:createFile', async (event) => {
+  const win = BrowserWindow.fromWebContents(event.sender);
   const { canceled, filePath } = await dialog.showSaveDialog({
     title: 'Create Threadboard Markdown file',
     defaultPath: 'threadboard.md',
@@ -306,23 +337,25 @@ ipcMain.handle('dialog:createFile', async () => {
     // File already exists; continue without overwriting.
   }
 
-  const content = await readFileContent(filePath).catch(() => '');
-  setCurrentFile(filePath);
+  const content = await readFileContent(win, filePath).catch(() => '');
+  setCurrentFile(win, filePath);
   await touchRecentFile(filePath);
   return { canceled: false, filePath, content };
 });
 
-ipcMain.handle('file:read', async (_event, maybePath) => {
+ipcMain.handle('file:read', async (event, maybePath) => {
+  const win = BrowserWindow.fromWebContents(event.sender);
   try {
-    const content = await readFileContent(maybePath);
+    const content = await readFileContent(win, maybePath);
     return { ok: true, content };
   } catch (error) {
     return { ok: false, error: error.message };
   }
 });
 
-ipcMain.handle('file:write', async (_event, content, maybePath) => {
-  const targetPath = maybePath || currentFilePath;
+ipcMain.handle('file:write', async (event, content, maybePath) => {
+  const win = BrowserWindow.fromWebContents(event.sender);
+  const targetPath = maybePath || getCurrentFilePath(win);
   if (!targetPath) {
     return { ok: false, error: 'No file selected' };
   }
@@ -334,24 +367,30 @@ ipcMain.handle('file:write', async (_event, content, maybePath) => {
   }
 });
 
-ipcMain.handle('file:get-current', () => currentFilePath);
+ipcMain.handle('file:get-current', (event) => {
+  const win = BrowserWindow.fromWebContents(event.sender);
+  return getCurrentFilePath(win);
+});
 
-ipcMain.handle('file:set-current', async (_event, filePath) => {
+ipcMain.handle('file:set-current', async (event, filePath) => {
+  const win = BrowserWindow.fromWebContents(event.sender);
   if (!filePath) {
-    setCurrentFile(null);
+    setCurrentFile(win, null);
     return { ok: true };
   }
 
   try {
     await fs.promises.access(filePath, fs.constants.F_OK);
-    setCurrentFile(filePath);
+    setCurrentFile(win, filePath);
     return { ok: true };
   } catch (error) {
     return { ok: false, error: error.message };
   }
 });
 
-ipcMain.handle('file:export-html', async (_event, htmlContent) => {
+ipcMain.handle('file:export-html', async (event, htmlContent) => {
+  const win = BrowserWindow.fromWebContents(event.sender);
+  const currentFilePath = getCurrentFilePath(win);
   const defaultName = currentFilePath
     ? `${path.parse(currentFilePath).name}.html`
     : 'threadboard-export.html';
@@ -409,7 +448,8 @@ ipcMain.handle('file:copy-path', (_event, filePath) => {
   }
 });
 
-ipcMain.handle('file:save-new', async (_event, content) => {
+ipcMain.handle('file:save-new', async (event, content) => {
+  const win = BrowserWindow.fromWebContents(event.sender);
   const { canceled, filePath } = await dialog.showSaveDialog({
     title: 'Save as Markdown file',
     defaultPath: 'imported.md',
@@ -425,7 +465,7 @@ ipcMain.handle('file:save-new', async (_event, content) => {
 
   try {
     await fs.promises.writeFile(filePath, content, 'utf8');
-    setCurrentFile(filePath);
+    setCurrentFile(win, filePath);
     await touchRecentFile(filePath);
     return { canceled: false, filePath, content };
   } catch (error) {
